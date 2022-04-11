@@ -195,7 +195,6 @@ public class MetadataIndexStateService {
             new ClusterStateUpdateTask(Priority.URGENT) {
 
                 private final Map<Index, ClusterBlock> blockedIndices = new HashMap<>();
-
                 @Override
                 public ClusterState execute(final ClusterState currentState) {
                     return addIndexClosedBlocks(concreteIndices, blockedIndices, currentState);
@@ -229,6 +228,11 @@ public class MetadataIndexStateService {
                                                     assert verifyResults.size() == closingResult.v2().size();
                                                     indices.addAll(closingResult.v2());
                                                     return allocationService.reroute(closingResult.v1(), "indices closed");
+                                                }
+
+                                                @Override
+                                                public String getMasterThrottlingKey() {
+                                                    return "close-indices";
                                                 }
 
                                                 @Override
@@ -974,6 +978,12 @@ public class MetadataIndexStateService {
         clusterService.submitStateUpdateTask(
             "open-indices " + indicesAsString,
             new AckedClusterStateUpdateTask<ClusterStateUpdateResponse>(Priority.URGENT, request, listener) {
+
+                @Override
+                public String getMasterThrottlingKey() {
+                    return "open-indices";
+                }
+
                 @Override
                 protected ClusterStateUpdateResponse newResponse(boolean acknowledged) {
                     return new ClusterStateUpdateResponse(acknowledged);

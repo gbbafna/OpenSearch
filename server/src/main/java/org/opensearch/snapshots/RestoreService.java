@@ -296,6 +296,11 @@ public class RestoreService implements ClusterStateApplier {
                     RestoreInfo restoreInfo = null;
 
                     @Override
+                    public String getMasterThrottlingKey() {
+                        return "restore_snapshot";
+                    }
+
+                    @Override
                     public ClusterState execute(ClusterState currentState) {
                         RestoreInProgress restoreInProgress = currentState.custom(RestoreInProgress.TYPE, RestoreInProgress.EMPTY);
                         if (currentState.getNodes().getMinNodeVersion().before(LegacyESVersion.V_7_0_0)) {

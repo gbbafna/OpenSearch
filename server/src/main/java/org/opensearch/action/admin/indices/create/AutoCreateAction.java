@@ -154,6 +154,11 @@ public final class AutoCreateAction extends ActionType<CreateIndexResponse> {
                             return createIndexService.applyCreateIndexRequest(currentState, updateRequest, false);
                         }
                     }
+
+                    @Override
+                    public String getMasterThrottlingKey() {
+                        return "auto-create";
+                    }
                 }
             );
         }

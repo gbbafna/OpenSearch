@@ -592,6 +592,11 @@ public class ScriptService implements Closeable, ClusterStateApplier {
                 }
 
                 @Override
+                public String getMasterThrottlingKey() {
+                    return "put-script";
+                }
+
+                @Override
                 public ClusterState execute(ClusterState currentState) throws Exception {
                     ScriptMetadata smd = currentState.metadata().custom(ScriptMetadata.TYPE);
                     smd = ScriptMetadata.putStoredScript(smd, request.id(), source);
@@ -618,11 +623,15 @@ public class ScriptService implements Closeable, ClusterStateApplier {
                 }
 
                 @Override
+                public String getMasterThrottlingKey() {
+                    return "delete-script";
+                }
+
+                @Override
                 public ClusterState execute(ClusterState currentState) throws Exception {
                     ScriptMetadata smd = currentState.metadata().custom(ScriptMetadata.TYPE);
                     smd = ScriptMetadata.deleteStoredScript(smd, request.id());
                     Metadata.Builder mdb = Metadata.builder(currentState.getMetadata()).putCustom(ScriptMetadata.TYPE, smd);
-
                     return ClusterState.builder(currentState).metadata(mdb).build();
                 }
             }

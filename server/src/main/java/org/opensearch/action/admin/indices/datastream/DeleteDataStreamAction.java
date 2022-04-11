@@ -199,6 +199,11 @@ public class DeleteDataStreamAction extends ActionType<AcknowledgedResponse> {
                     }
 
                     @Override
+                    public String getMasterThrottlingKey() {
+                        return "remove-data-stream";
+                    }
+
+                    @Override
                     public void clusterStateProcessed(String source, ClusterState oldState, ClusterState newState) {
                         listener.onResponse(new AcknowledgedResponse(true));
                     }
