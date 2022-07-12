@@ -24,13 +24,7 @@ public class WeightedRoundRobin<T> implements Iterator<T>, Iterable<T> {
     private int lastSelectedEntity;
     private double currentWeight = 0;
 
-    public static final Setting<List<String>> WEIGHTS_WRR = Setting.listSetting(
-        "cluster.routing.shard_routing.wrrweights",
-        emptyList(),
-        Function.identity(),
-        Setting.Property.Dynamic,
-        Setting.Property.NodeScope
-    );
+//    server/src/main/java/org/opensearch/cluster/routing/WeightedRoundRobin.java 
 
     public WeightedRoundRobin(int lastSelectedEntity) {
         this.entities = null;

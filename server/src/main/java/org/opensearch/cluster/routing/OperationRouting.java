@@ -52,7 +52,10 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
+
+import static java.util.Collections.emptyList;
 
 /**
  * Routes cluster operations
@@ -75,6 +78,14 @@ public class OperationRouting {
         Setting.Property.NodeScope
     );
 
+    public static final Setting<List<String>> WEIGHTS_WRR = Setting.listSetting(
+        "cluster.routing.shard_routing.wrrweights",
+        emptyList(),
+        Function.identity(),
+        Setting.Property.Dynamic,
+        Setting.Property.NodeScope
+    );
+
     public static final String IGNORE_AWARENESS_ATTRIBUTES = "cluster.search.ignore_awareness_attributes";
     public static final Setting<Boolean> IGNORE_AWARENESS_ATTRIBUTES_SETTING = Setting.boolSetting(
         IGNORE_AWARENESS_ATTRIBUTES,
@@ -85,6 +96,15 @@ public class OperationRouting {
     private volatile List<String> awarenessAttributes;
     private volatile boolean useAdaptiveReplicaSelection;
     private volatile boolean ignoreAwarenessAttr;
+
+    public List<String> getWeightsWRR() {
+        return weightsWRR;
+    }
+
+    public void setWeightsWRR(List<String> weightsWRR) {
+        this.weightsWRR = weightsWRR;
+    }
+
     private List<String> weightsWRR;
 
     private volatile boolean useWeightedRoundRobin;
@@ -101,7 +121,9 @@ public class OperationRouting {
         this.useWeightedRoundRobin = USE_WEIGHTED_ROUND_ROBIN.get(settings);
         clusterSettings.addSettingsUpdateConsumer(USE_ADAPTIVE_REPLICA_SELECTION_SETTING, this::setUseAdaptiveReplicaSelection);
         clusterSettings.addSettingsUpdateConsumer(IGNORE_AWARENESS_ATTRIBUTES_SETTING, this::setIgnoreAwarenessAttributes);
-        this.weightsWRR = WeightedRoundRobin.WEIGHTS_WRR.get(settings);
+        this.weightsWRR = WEIGHTS_WRR.get(settings);
+        clusterSettings.addSettingsUpdateConsumer(USE_WEIGHTED_ROUND_ROBIN, this::setUseWeightedRoundRobin);
+        clusterSettings.addSettingsUpdateConsumer(WEIGHTS_WRR, this::setWeightsWRR);
 
     }
 
