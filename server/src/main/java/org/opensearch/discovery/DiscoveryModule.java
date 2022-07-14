@@ -113,7 +113,7 @@ public class DiscoveryModule {
         Property.NodeScope
     );
 
-    private final Discovery discovery;
+    public final Discovery discovery;
 
     public DiscoveryModule(
         Settings settings,

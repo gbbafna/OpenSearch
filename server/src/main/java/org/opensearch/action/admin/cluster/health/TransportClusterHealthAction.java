@@ -46,9 +46,11 @@ import org.opensearch.cluster.ClusterStateUpdateTask;
 import org.opensearch.cluster.LocalClusterUpdateTask;
 import org.opensearch.cluster.NotClusterManagerException;
 import org.opensearch.cluster.block.ClusterBlockException;
+import org.opensearch.cluster.coordination.Coordinator;
 import org.opensearch.cluster.health.ClusterHealthStatus;
 import org.opensearch.cluster.metadata.IndexNameExpressionResolver;
 import org.opensearch.cluster.metadata.ProcessClusterEventTimeoutException;
+import org.opensearch.cluster.node.DiscoveryNode;
 import org.opensearch.cluster.routing.UnassignedInfo;
 import org.opensearch.cluster.routing.allocation.AllocationService;
 import org.opensearch.cluster.service.ClusterService;
@@ -57,13 +59,16 @@ import org.opensearch.common.inject.Inject;
 import org.opensearch.common.io.stream.StreamInput;
 import org.opensearch.common.unit.TimeValue;
 import org.opensearch.common.util.CollectionUtils;
+import org.opensearch.discovery.Discovery;
 import org.opensearch.index.IndexNotFoundException;
 import org.opensearch.node.NodeClosedException;
+import org.opensearch.node.NodeService;
 import org.opensearch.tasks.Task;
 import org.opensearch.threadpool.ThreadPool;
 import org.opensearch.transport.TransportService;
 
 import java.io.IOException;
+import java.util.Iterator;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
@@ -78,6 +83,8 @@ public class TransportClusterHealthAction extends TransportClusterManagerNodeRea
 
     private final AllocationService allocationService;
 
+    private final Discovery discovery;
+
     @Inject
     public TransportClusterHealthAction(
         TransportService transportService,
@@ -85,7 +92,8 @@ public class TransportClusterHealthAction extends TransportClusterManagerNodeRea
         ThreadPool threadPool,
         ActionFilters actionFilters,
         IndexNameExpressionResolver indexNameExpressionResolver,
-        AllocationService allocationService
+        AllocationService allocationService,
+        NodeService nodeService
     ) {
         super(
             ClusterHealthAction.NAME,
@@ -98,6 +106,7 @@ public class TransportClusterHealthAction extends TransportClusterManagerNodeRea
             indexNameExpressionResolver
         );
         this.allocationService = allocationService;
+        this.discovery = nodeService.discovery;
     }
 
     @Override
@@ -131,6 +140,24 @@ public class TransportClusterHealthAction extends TransportClusterManagerNodeRea
         final ClusterState unusedState,
         final ActionListener<ClusterHealthResponse> listener
     ) {
+        if (discovery instanceof Coordinator) {
+            //find the node .
+            String masterId = clusterService.state().getNodes().getMasterNodeId();
+            DiscoveryNode mast = clusterService.state().getNodes().get(masterId);
+            if ( mast.getName() == "runTask-2" ) {
+                logger.info("not doing anything");
+            } else {
+                logger.info("trying to changes master ");
+                Iterator<DiscoveryNode> masterNodes = clusterService.state().getNodes().getMasterNodes().valuesIt();
+                while (masterNodes.hasNext()) {
+                    DiscoveryNode masterNode = masterNodes.next();
+                    logger.info("the master nodes " +  masterNode.getId() + " - " + masterNode.getName());
+                    if ( masterNode.getName() == "runTask-2" ) {
+                        ((Coordinator) discovery).abdicateTo2(masterNode);
+                    }
+                }
+            }
+        }
 
         final int waitCount = getWaitCount(request);
 

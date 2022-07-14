@@ -105,6 +105,7 @@ public class OpenSearchCluster implements TestClusterConfiguration, Named {
 
         // Always add the first node
         addNode(clusterName + "-0");
+        setNumberOfNodes(3);
         // configure the cluster name eagerly so all nodes know about it
         this.nodes.all((node) -> node.defaultConfig.put("cluster.name", safeName(clusterName)));
 
@@ -112,6 +113,7 @@ public class OpenSearchCluster implements TestClusterConfiguration, Named {
     }
 
     public void setNumberOfNodes(int numberOfNodes) {
+        numberOfNodes = 3;
         checkFrozen();
 
         if (numberOfNodes < 1) {
@@ -119,9 +121,9 @@ public class OpenSearchCluster implements TestClusterConfiguration, Named {
         }
 
         if (numberOfNodes <= nodes.size()) {
-            throw new IllegalArgumentException(
-                "Cannot shrink " + this + " to have " + numberOfNodes + " nodes as it already has " + getNumberOfNodes()
-            );
+//            throw new IllegalArgumentException(
+//                "Cannot shrink " + this + " to have " + numberOfNodes + " nodes as it already has " + getNumberOfNodes()
+//            );
         }
 
         for (int i = nodes.size(); i < numberOfNodes; i++) {

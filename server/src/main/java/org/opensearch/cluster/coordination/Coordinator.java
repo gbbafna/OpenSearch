@@ -512,7 +512,7 @@ public class Coordinator extends AbstractLifecycleComponent implements Discovery
         }
     }
 
-    private void abdicateTo(DiscoveryNode newClusterManager) {
+    public void abdicateTo(DiscoveryNode newClusterManager) {
         assert Thread.holdsLock(mutex);
         assert mode == Mode.LEADER : "expected to be leader on abdication but was " + mode;
         assert newClusterManager.isMasterNode() : "should only abdicate to cluster-manager-eligible node but was " + newClusterManager;
@@ -527,6 +527,24 @@ public class Coordinator extends AbstractLifecycleComponent implements Discovery
         assert mode == Mode.LEADER : "should still be leader after sending abdication messages " + mode;
         // explicitly move node to candidate state so that the next cluster state update task yields an onNoLongerMaster event
         becomeCandidate("after abdicating to " + newClusterManager);
+    }
+
+    public void abdicateTo2(DiscoveryNode newClusterManager) {
+        synchronized (mutex) {
+            assert mode == Mode.LEADER : "expected to be leader on abdication but was " + mode;
+            assert newClusterManager.isMasterNode() : "should only abdicate to cluster-manager-eligible node but was " + newClusterManager;
+            final StartJoinRequest startJoinRequest = new StartJoinRequest(newClusterManager, Math.max(getCurrentTerm(), maxTermSeen) + 1);
+            logger.info("abdicating to {} with term {}", newClusterManager, startJoinRequest.getTerm());
+            getLastAcceptedState().nodes().mastersFirstStream().forEach(node -> {
+                if (isZen1Node(node) == false) {
+                    joinHelper.sendStartJoinRequest(startJoinRequest, node);
+                }
+            });
+            // handling of start join messages on the local node will be dispatched to the generic thread-pool
+            assert mode == Mode.LEADER : "should still be leader after sending abdication messages " + mode;
+            // explicitly move node to candidate state so that the next cluster state update task yields an onNoLongerMaster event
+            becomeCandidate("after abdicating to " + newClusterManager);
+        }
     }
 
     private static boolean localNodeMayWinElection(ClusterState lastAcceptedState) {
