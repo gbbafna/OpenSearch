@@ -68,7 +68,6 @@ import org.opensearch.threadpool.ThreadPool;
 import org.opensearch.transport.TransportService;
 
 import java.io.IOException;
-import java.util.Iterator;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
@@ -148,14 +147,7 @@ public class TransportClusterHealthAction extends TransportClusterManagerNodeRea
                 logger.info("not doing anything");
             } else {
                 logger.info("trying to changes master ");
-                Iterator<DiscoveryNode> masterNodes = clusterService.state().getNodes().getMasterNodes().valuesIt();
-                while (masterNodes.hasNext()) {
-                    DiscoveryNode masterNode = masterNodes.next();
-                    logger.info("the master nodes " +  masterNode.getId() + " - " + masterNode.getName());
-                    if ( masterNode.getName() == "runTask-2" ) {
-                        ((Coordinator) discovery).abdicateTo2(masterNode);
-                    }
-                }
+                ((Coordinator) discovery).abdicateFrom(mast);
             }
         }
 

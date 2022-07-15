@@ -547,6 +547,39 @@ public class Coordinator extends AbstractLifecycleComponent implements Discovery
         }
     }
 
+    public void abdicateFrom(DiscoveryNode newClusterManager) {
+            //Exclude itself
+            clusterManagerService.submitStateUpdateTask("reconfigure", new ClusterStateUpdateTask(Priority.URGENT) {
+                @Override
+                public ClusterState execute(ClusterState currentState) {
+
+                    VotingConfigExclusion votingConfigExclusion = new VotingConfigExclusion(newClusterManager);
+                    Set<VotingConfigExclusion> resolvedExclusions = new HashSet<>();
+                    resolvedExclusions.add(votingConfigExclusion);
+                    final CoordinationMetadata.Builder builder = CoordinationMetadata.builder(getLastAcceptedState().coordinationMetadata());
+                    resolvedExclusions.forEach(builder::addVotingConfigExclusion);
+                    final Metadata newMetadata = Metadata.builder(getLastAcceptedState().metadata()).coordinationMetadata(builder.build()).build();
+                    final ClusterState newState = ClusterState.builder(getLastAcceptedState()).metadata(newMetadata).build();
+
+                    return newState;
+                }
+
+                @Override
+                public void clusterStateProcessed(String source, ClusterState oldState, ClusterState newState) {
+                    logger.debug("Removed repository cleanup task [{}] from cluster state");
+                    // explicitly move node to candidate state so that the next cluster state update task yields an onNoLongerMaster event
+                    synchronized (mutex) {
+                        becomeCandidate("after abdicating to " + newClusterManager);
+                    }
+                }
+
+                @Override
+                public void onFailure(String source, Exception e) {
+                    logger.debug("reconfiguration failed", e);
+                }
+            });
+    }
+
     private static boolean localNodeMayWinElection(ClusterState lastAcceptedState) {
         final DiscoveryNode localNode = lastAcceptedState.nodes().getLocalNode();
         assert localNode != null;
