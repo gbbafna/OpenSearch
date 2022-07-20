@@ -71,8 +71,8 @@ import org.opensearch.common.settings.Setting;
 import org.opensearch.common.settings.Settings;
 import org.opensearch.common.transport.TransportAddress;
 import org.opensearch.common.unit.TimeValue;
-import org.opensearch.common.util.concurrent.OpenSearchExecutors;
 import org.opensearch.common.util.concurrent.ListenableFuture;
+import org.opensearch.common.util.concurrent.OpenSearchExecutors;
 import org.opensearch.common.xcontent.XContentHelper;
 import org.opensearch.common.xcontent.json.JsonXContent;
 import org.opensearch.discovery.Discovery;
@@ -528,58 +528,6 @@ public class Coordinator extends AbstractLifecycleComponent implements Discovery
         // explicitly move node to candidate state so that the next cluster state update task yields an onNoLongerMaster event
         becomeCandidate("after abdicating to " + newClusterManager);
     }
-
-    public void abdicateTo2(DiscoveryNode newClusterManager) {
-        synchronized (mutex) {
-            assert mode == Mode.LEADER : "expected to be leader on abdication but was " + mode;
-            assert newClusterManager.isMasterNode() : "should only abdicate to cluster-manager-eligible node but was " + newClusterManager;
-            final StartJoinRequest startJoinRequest = new StartJoinRequest(newClusterManager, Math.max(getCurrentTerm(), maxTermSeen) + 1);
-            logger.info("abdicating to {} with term {}", newClusterManager, startJoinRequest.getTerm());
-            getLastAcceptedState().nodes().mastersFirstStream().forEach(node -> {
-                if (isZen1Node(node) == false) {
-                    joinHelper.sendStartJoinRequest(startJoinRequest, node);
-                }
-            });
-            // handling of start join messages on the local node will be dispatched to the generic thread-pool
-            assert mode == Mode.LEADER : "should still be leader after sending abdication messages " + mode;
-            // explicitly move node to candidate state so that the next cluster state update task yields an onNoLongerMaster event
-            becomeCandidate("after abdicating to " + newClusterManager);
-        }
-    }
-
-    public void abdicateFrom(DiscoveryNode newClusterManager) {
-            //Exclude itself
-            clusterManagerService.submitStateUpdateTask("reconfigure", new ClusterStateUpdateTask(Priority.URGENT) {
-                @Override
-                public ClusterState execute(ClusterState currentState) {
-
-                    VotingConfigExclusion votingConfigExclusion = new VotingConfigExclusion(newClusterManager);
-                    Set<VotingConfigExclusion> resolvedExclusions = new HashSet<>();
-                    resolvedExclusions.add(votingConfigExclusion);
-                    final CoordinationMetadata.Builder builder = CoordinationMetadata.builder(getLastAcceptedState().coordinationMetadata());
-                    resolvedExclusions.forEach(builder::addVotingConfigExclusion);
-                    final Metadata newMetadata = Metadata.builder(getLastAcceptedState().metadata()).coordinationMetadata(builder.build()).build();
-                    final ClusterState newState = ClusterState.builder(getLastAcceptedState()).metadata(newMetadata).build();
-
-                    return newState;
-                }
-
-                @Override
-                public void clusterStateProcessed(String source, ClusterState oldState, ClusterState newState) {
-                    logger.debug("Removed repository cleanup task [{}] from cluster state");
-                    // explicitly move node to candidate state so that the next cluster state update task yields an onNoLongerMaster event
-                    synchronized (mutex) {
-                        becomeCandidate("after abdicating to " + newClusterManager);
-                    }
-                }
-
-                @Override
-                public void onFailure(String source, Exception e) {
-                    logger.debug("reconfiguration failed", e);
-                }
-            });
-    }
-
     private static boolean localNodeMayWinElection(ClusterState lastAcceptedState) {
         final DiscoveryNode localNode = lastAcceptedState.nodes().getLocalNode();
         assert localNode != null;

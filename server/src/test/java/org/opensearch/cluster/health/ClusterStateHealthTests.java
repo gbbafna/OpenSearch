@@ -178,6 +178,8 @@ public class ClusterStateHealthTests extends OpenSearchTestCase {
             new ActionFilters(new HashSet<>()),
             indexNameExpressionResolver,
             new AllocationService(null, new TestGatewayAllocator(), null, null, null),
+            null,
+            null,
             null
         );
         PlainActionFuture<ClusterHealthResponse> listener = new PlainActionFuture<>();
