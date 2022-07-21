@@ -107,6 +107,14 @@ import org.opensearch.action.admin.cluster.shards.ClusterSearchShardsAction;
 import org.opensearch.action.admin.cluster.shards.ClusterSearchShardsRequest;
 import org.opensearch.action.admin.cluster.shards.ClusterSearchShardsRequestBuilder;
 import org.opensearch.action.admin.cluster.shards.ClusterSearchShardsResponse;
+import org.opensearch.action.admin.cluster.shards.routing.wrr.get.ClusterGetWRRWeightsAction;
+import org.opensearch.action.admin.cluster.shards.routing.wrr.get.ClusterGetWRRWeightsRequest;
+import org.opensearch.action.admin.cluster.shards.routing.wrr.get.ClusterGetWRRWeightsRequestBuilder;
+import org.opensearch.action.admin.cluster.shards.routing.wrr.get.ClusterGetWRRWeightsResponse;
+import org.opensearch.action.admin.cluster.shards.routing.wrr.put.ClusterPutWRRWeightsAction;
+import org.opensearch.action.admin.cluster.shards.routing.wrr.put.ClusterPutWRRWeightsRequest;
+import org.opensearch.action.admin.cluster.shards.routing.wrr.put.ClusterPutWRRWeightsRequestBuilder;
+import org.opensearch.action.admin.cluster.shards.routing.wrr.put.ClusterPutWRRWeightsResponse;
 import org.opensearch.action.admin.cluster.snapshots.clone.CloneSnapshotAction;
 import org.opensearch.action.admin.cluster.snapshots.clone.CloneSnapshotRequest;
 import org.opensearch.action.admin.cluster.snapshots.clone.CloneSnapshotRequestBuilder;
@@ -1231,6 +1239,36 @@ public abstract class AbstractClient implements Client {
         @Override
         public ActionFuture<AcknowledgedResponse> deleteDanglingIndex(DeleteDanglingIndexRequest request) {
             return execute(DeleteDanglingIndexAction.INSTANCE, request);
+        }
+
+        @Override
+        public ActionFuture<ClusterPutWRRWeightsResponse> putWRRWeights(ClusterPutWRRWeightsRequest request) {
+            return execute(ClusterPutWRRWeightsAction.INSTANCE, request);
+        }
+
+        @Override
+        public void putWRRWeights(ClusterPutWRRWeightsRequest request, ActionListener<ClusterPutWRRWeightsResponse> listener) {
+            execute(ClusterPutWRRWeightsAction.INSTANCE, request, listener);
+        }
+
+        @Override
+        public ClusterPutWRRWeightsRequestBuilder prepareWRRWeights() {
+            return new ClusterPutWRRWeightsRequestBuilder(this, ClusterPutWRRWeightsAction.INSTANCE);
+        }
+
+        @Override
+        public ActionFuture<ClusterGetWRRWeightsResponse> getWRRWeights(ClusterGetWRRWeightsRequest request) {
+            return execute(ClusterGetWRRWeightsAction.INSTANCE, request);
+        }
+
+        @Override
+        public void getWRRWeights(ClusterGetWRRWeightsRequest request, ActionListener<ClusterGetWRRWeightsResponse> listener) {
+            execute(ClusterGetWRRWeightsAction.INSTANCE, request, listener);
+        }
+
+        @Override
+        public ClusterGetWRRWeightsRequestBuilder prepareGetWRRWeights() {
+            return new ClusterGetWRRWeightsRequestBuilder(this, ClusterGetWRRWeightsAction.INSTANCE);
         }
 
         @Override
