@@ -52,7 +52,10 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
+
+import static java.util.Collections.emptyList;
 
 /**
  * Routes cluster operations
@@ -68,6 +71,21 @@ public class OperationRouting {
         Setting.Property.NodeScope
     );
 
+    public static final Setting<Boolean> USE_WEIGHTED_ROUND_ROBIN = Setting.boolSetting(
+        "cluster.routing.use_weighted_round_robin",
+        true,
+        Setting.Property.Dynamic,
+        Setting.Property.NodeScope
+    );
+
+    public static final Setting<List<String>> WEIGHTS_WRR = Setting.listSetting(
+        "cluster.routing.shard_routing.wrrweights",
+        emptyList(),
+        Function.identity(),
+        Setting.Property.Dynamic,
+        Setting.Property.NodeScope
+    );
+
     public static final String IGNORE_AWARENESS_ATTRIBUTES = "cluster.search.ignore_awareness_attributes";
     public static final Setting<Boolean> IGNORE_AWARENESS_ATTRIBUTES_SETTING = Setting.boolSetting(
         IGNORE_AWARENESS_ATTRIBUTES,
@@ -79,6 +97,18 @@ public class OperationRouting {
     private volatile boolean useAdaptiveReplicaSelection;
     private volatile boolean ignoreAwarenessAttr;
 
+    public List<String> getWeightsWRR() {
+        return weightsWRR;
+    }
+
+    public void setWeightsWRR(List<String> weightsWRR) {
+        this.weightsWRR = weightsWRR;
+    }
+
+    private List<String> weightsWRR;
+
+    private volatile boolean useWeightedRoundRobin;
+
     public OperationRouting(Settings settings, ClusterSettings clusterSettings) {
         // whether to ignore awareness attributes when routing requests
         this.ignoreAwarenessAttr = clusterSettings.get(IGNORE_AWARENESS_ATTRIBUTES_SETTING);
@@ -88,8 +118,13 @@ public class OperationRouting {
             this::setAwarenessAttributes
         );
         this.useAdaptiveReplicaSelection = USE_ADAPTIVE_REPLICA_SELECTION_SETTING.get(settings);
+        this.useWeightedRoundRobin = USE_WEIGHTED_ROUND_ROBIN.get(settings);
         clusterSettings.addSettingsUpdateConsumer(USE_ADAPTIVE_REPLICA_SELECTION_SETTING, this::setUseAdaptiveReplicaSelection);
         clusterSettings.addSettingsUpdateConsumer(IGNORE_AWARENESS_ATTRIBUTES_SETTING, this::setIgnoreAwarenessAttributes);
+        this.weightsWRR = WEIGHTS_WRR.get(settings);
+        clusterSettings.addSettingsUpdateConsumer(USE_WEIGHTED_ROUND_ROBIN, this::setUseWeightedRoundRobin);
+        clusterSettings.addSettingsUpdateConsumer(WEIGHTS_WRR, this::setWeightsWRR);
+
     }
 
     void setUseAdaptiveReplicaSelection(boolean useAdaptiveReplicaSelection) {
@@ -98,6 +133,14 @@ public class OperationRouting {
 
     void setIgnoreAwarenessAttributes(boolean ignoreAwarenessAttributes) {
         this.ignoreAwarenessAttr = ignoreAwarenessAttributes;
+    }
+
+    public boolean isUseWeightedRoundRobin() {
+        return useWeightedRoundRobin;
+    }
+
+    public void setUseWeightedRoundRobin(boolean useWeightedRoundRobin) {
+        this.useWeightedRoundRobin = useWeightedRoundRobin;
     }
 
     public boolean isIgnoreAwarenessAttr() {
@@ -301,7 +344,10 @@ public class OperationRouting {
         @Nullable Map<String, Long> nodeCounts
     ) {
         if (ignoreAwarenessAttributes()) {
-            if (useAdaptiveReplicaSelection) {
+            // TODO: move call for WRR to right call
+            if (useWeightedRoundRobin) {
+                return indexShard.activeInitializingShardsWRR(weightsWRR, nodes);
+            } else if (useAdaptiveReplicaSelection) {
                 return indexShard.activeInitializingShardsRankedIt(collectorService, nodeCounts);
             } else {
                 return indexShard.activeInitializingShardsRandomIt();
