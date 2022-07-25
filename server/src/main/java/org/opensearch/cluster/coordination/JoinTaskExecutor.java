@@ -39,6 +39,9 @@ import org.opensearch.cluster.ClusterState;
 import org.opensearch.cluster.ClusterStateTaskExecutor;
 import org.opensearch.cluster.NotClusterManagerException;
 import org.opensearch.cluster.block.ClusterBlocks;
+import org.opensearch.cluster.decommission.DecommissionedAttribute;
+import org.opensearch.cluster.metadata.DecommissionedAttributeMetadata;
+import org.opensearch.cluster.metadata.DecommissionedAttributesMetadata;
 import org.opensearch.cluster.metadata.IndexMetadata;
 import org.opensearch.cluster.metadata.Metadata;
 import org.opensearch.cluster.node.DiscoveryNode;
@@ -458,6 +461,18 @@ public class JoinTaskExecutor implements ClusterStateTaskExecutor<JoinTaskExecut
         }
     }
 
+    public static void ensureNodeNotDecommissioned(DiscoveryNode node, Metadata metadata) {
+        DecommissionedAttributesMetadata decommissionedAttributesMetadata = metadata.custom(DecommissionedAttributesMetadata.TYPE);
+        DecommissionedAttributeMetadata decommissionedAttribute = decommissionedAttributesMetadata.decommissionedAttribute("awareness");
+        for(String decommissionedZone: decommissionedAttribute.decommissionedAttribute().values()){
+            if (node.getAttributes().get(decommissionedAttribute.decommissionedAttribute().key()).equals(decommissionedZone)) {
+                throw new NodeDecommissionedException(
+                    "node is decommissioned"
+                );
+            }
+        }
+    }
+
     public static Collection<BiConsumer<DiscoveryNode, ClusterState>> addBuiltInJoinValidators(
         Collection<BiConsumer<DiscoveryNode, ClusterState>> onJoinValidators
     ) {
@@ -465,6 +480,7 @@ public class JoinTaskExecutor implements ClusterStateTaskExecutor<JoinTaskExecut
         validators.add((node, state) -> {
             ensureNodesCompatibility(node.getVersion(), state.getNodes());
             ensureIndexCompatibility(node.getVersion(), state.getMetadata());
+            ensureNodeNotDecommissioned(node, state.getMetadata());
         });
         validators.addAll(onJoinValidators);
         return Collections.unmodifiableCollection(validators);
