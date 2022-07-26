@@ -82,7 +82,7 @@ public class NodeService implements Closeable {
     private final IndexingPressureService indexingPressureService;
     private final AggregationUsageService aggregationUsageService;
 
-    private final Discovery discovery;
+    public final Discovery discovery;
 
     NodeService(
         Settings settings,

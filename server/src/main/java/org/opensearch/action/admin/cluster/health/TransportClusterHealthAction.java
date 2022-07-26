@@ -36,6 +36,12 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.message.ParameterizedMessage;
 import org.opensearch.action.ActionListener;
+import org.opensearch.action.admin.cluster.configuration.AddVotingConfigExclusionsRequest;
+import org.opensearch.action.admin.cluster.configuration.AddVotingConfigExclusionsResponse;
+import org.opensearch.action.admin.cluster.configuration.ClearVotingConfigExclusionsRequest;
+import org.opensearch.action.admin.cluster.configuration.ClearVotingConfigExclusionsResponse;
+import org.opensearch.action.admin.cluster.configuration.TransportAddVotingConfigExclusionsAction;
+import org.opensearch.action.admin.cluster.configuration.TransportClearVotingConfigExclusionsAction;
 import org.opensearch.action.support.ActionFilters;
 import org.opensearch.action.support.ActiveShardCount;
 import org.opensearch.action.support.IndicesOptions;
@@ -49,6 +55,7 @@ import org.opensearch.cluster.block.ClusterBlockException;
 import org.opensearch.cluster.health.ClusterHealthStatus;
 import org.opensearch.cluster.metadata.IndexNameExpressionResolver;
 import org.opensearch.cluster.metadata.ProcessClusterEventTimeoutException;
+import org.opensearch.cluster.node.DiscoveryNode;
 import org.opensearch.cluster.routing.UnassignedInfo;
 import org.opensearch.cluster.routing.allocation.AllocationService;
 import org.opensearch.cluster.service.ClusterService;
@@ -57,13 +64,16 @@ import org.opensearch.common.inject.Inject;
 import org.opensearch.common.io.stream.StreamInput;
 import org.opensearch.common.unit.TimeValue;
 import org.opensearch.common.util.CollectionUtils;
+import org.opensearch.discovery.Discovery;
 import org.opensearch.index.IndexNotFoundException;
 import org.opensearch.node.NodeClosedException;
+import org.opensearch.node.NodeService;
 import org.opensearch.tasks.Task;
 import org.opensearch.threadpool.ThreadPool;
 import org.opensearch.transport.TransportService;
 
 import java.io.IOException;
+import java.util.Map;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
@@ -78,6 +88,12 @@ public class TransportClusterHealthAction extends TransportClusterManagerNodeRea
 
     private final AllocationService allocationService;
 
+    private final Discovery discovery;
+
+    private final TransportAddVotingConfigExclusionsAction exclusionsAction;
+
+    private final TransportClearVotingConfigExclusionsAction clearAction;
+
     @Inject
     public TransportClusterHealthAction(
         TransportService transportService,
@@ -85,7 +101,10 @@ public class TransportClusterHealthAction extends TransportClusterManagerNodeRea
         ThreadPool threadPool,
         ActionFilters actionFilters,
         IndexNameExpressionResolver indexNameExpressionResolver,
-        AllocationService allocationService
+        AllocationService allocationService,
+        NodeService nodeService,
+        TransportAddVotingConfigExclusionsAction exclusionsAction,
+        TransportClearVotingConfigExclusionsAction clearAction
     ) {
         super(
             ClusterHealthAction.NAME,
@@ -98,6 +117,9 @@ public class TransportClusterHealthAction extends TransportClusterManagerNodeRea
             indexNameExpressionResolver
         );
         this.allocationService = allocationService;
+        this.discovery = nodeService.discovery;
+        this.exclusionsAction = exclusionsAction;
+        this.clearAction = clearAction;
     }
 
     @Override
@@ -131,6 +153,46 @@ public class TransportClusterHealthAction extends TransportClusterManagerNodeRea
         final ClusterState unusedState,
         final ActionListener<ClusterHealthResponse> listener
     ) {
+        //find the node .
+        String masterId = clusterService.state().getNodes().getMasterNodeId();
+        DiscoveryNode mast = clusterService.state().getNodes().get(masterId);
+        Map<String, String> attr =  mast.getAttributes();
+        logger.info("Master name is " + mast.getName() + "attributes" + attr);
+        // ToDo : Match zone values from attributes
+        if ( mast.getName() != "runTask-2" ) {
+            logger.info("changing  master ");
+            ActionListener<ClearVotingConfigExclusionsResponse> listener3 =  new ActionListener<>() {
+                @Override
+                public void onResponse(ClearVotingConfigExclusionsResponse clearVotingConfigExclusionsResponse) {
+                    logger.info("remoed   exclude di as well ");
+                }
+
+                @Override
+                public void onFailure(Exception e) {
+                    listener.onFailure(e);
+                }
+            };
+
+            ActionListener<AddVotingConfigExclusionsResponse> listener2 = new ActionListener<>() {
+
+                @Override
+                public void onResponse(AddVotingConfigExclusionsResponse addVotingConfigExclusionsResponse) {
+                    logger.info("trying to changes master ");
+                    ClearVotingConfigExclusionsRequest req = new ClearVotingConfigExclusionsRequest();
+                    req.setWaitForRemoval(false);
+                    clearAction.execute(req, listener3);
+                }
+
+                @Override
+                public void onFailure(Exception e) {
+                    listener.onFailure(e);
+                }
+            };
+
+            exclusionsAction.execute(new AddVotingConfigExclusionsRequest(mast.getName()), listener2  );
+            logger.info("changed  master ");
+        }
+
 
         final int waitCount = getWaitCount(request);
 

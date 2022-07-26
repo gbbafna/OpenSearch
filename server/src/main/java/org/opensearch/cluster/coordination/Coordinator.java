@@ -71,8 +71,8 @@ import org.opensearch.common.settings.Setting;
 import org.opensearch.common.settings.Settings;
 import org.opensearch.common.transport.TransportAddress;
 import org.opensearch.common.unit.TimeValue;
-import org.opensearch.common.util.concurrent.OpenSearchExecutors;
 import org.opensearch.common.util.concurrent.ListenableFuture;
+import org.opensearch.common.util.concurrent.OpenSearchExecutors;
 import org.opensearch.common.xcontent.XContentHelper;
 import org.opensearch.common.xcontent.json.JsonXContent;
 import org.opensearch.discovery.Discovery;
@@ -512,7 +512,7 @@ public class Coordinator extends AbstractLifecycleComponent implements Discovery
         }
     }
 
-    private void abdicateTo(DiscoveryNode newClusterManager) {
+    public void abdicateTo(DiscoveryNode newClusterManager) {
         assert Thread.holdsLock(mutex);
         assert mode == Mode.LEADER : "expected to be leader on abdication but was " + mode;
         assert newClusterManager.isClusterManagerNode() : "should only abdicate to cluster-manager-eligible node but was "
@@ -529,7 +529,6 @@ public class Coordinator extends AbstractLifecycleComponent implements Discovery
         // explicitly move node to candidate state so that the next cluster state update task yields an onNoLongerMaster event
         becomeCandidate("after abdicating to " + newClusterManager);
     }
-
     private static boolean localNodeMayWinElection(ClusterState lastAcceptedState) {
         final DiscoveryNode localNode = lastAcceptedState.nodes().getLocalNode();
         assert localNode != null;
