@@ -129,7 +129,7 @@ public abstract class PeerFinder {
     }
 
     public void activate(final DiscoveryNodes lastAcceptedNodes) {
-        logger.trace("activating with {}", lastAcceptedNodes);
+        logger.info("activating with {}", lastAcceptedNodes);
 
         synchronized (mutex) {
             assert assertInactiveWithNoKnownPeers();
@@ -145,7 +145,7 @@ public abstract class PeerFinder {
     public void deactivate(DiscoveryNode leader) {
         final boolean peersRemoved;
         synchronized (mutex) {
-            logger.trace("deactivating and setting leader to {}", leader);
+            logger.info("deactivating and setting leader to {}", leader);
             active = false;
             peersRemoved = handleWakeUp();
             this.leader = Optional.of(leader);
@@ -286,11 +286,11 @@ public abstract class PeerFinder {
         final boolean peersRemoved = peersByAddress.values().removeIf(Peer::handleWakeUp);
 
         if (active == false) {
-            logger.trace("not active");
+            logger.info("not active");
             return peersRemoved;
         }
 
-        logger.trace("probing cluster-manager nodes from cluster state: {}", lastAcceptedNodes);
+        logger.info("probing cluster-manager nodes from cluster state: {}", lastAcceptedNodes);
         for (ObjectCursor<DiscoveryNode> discoveryNodeObjectCursor : lastAcceptedNodes.getMasterNodes().values()) {
             startProbe(discoveryNodeObjectCursor.value.getAddress());
         }
@@ -298,7 +298,7 @@ public abstract class PeerFinder {
         configuredHostsResolver.resolveConfiguredHosts(providedAddresses -> {
             synchronized (mutex) {
                 lastResolvedAddresses = providedAddresses;
-                logger.trace("probing resolved transport addresses {}", providedAddresses);
+                logger.info("probing resolved transport addresses {}", providedAddresses);
                 providedAddresses.forEach(this::startProbe);
             }
         });
@@ -337,12 +337,12 @@ public abstract class PeerFinder {
     protected void startProbe(TransportAddress transportAddress) {
         assert holdsLock() : "PeerFinder mutex not held";
         if (active == false) {
-            logger.trace("startProbe({}) not running", transportAddress);
+            logger.info("startProbe({}) not running", transportAddress);
             return;
         }
 
         if (transportAddress.equals(getLocalNode().getAddress())) {
-            logger.trace("startProbe({}) not probing local node", transportAddress);
+            logger.info("startProbe({}) not probing local node", transportAddress);
             return;
         }
 
@@ -379,7 +379,7 @@ public abstract class PeerFinder {
                         requestPeers();
                     }
                 } else {
-                    logger.trace("{} no longer connected", this);
+                    logger.info("{} no longer connected", this);
                     return true;
                 }
             }
@@ -392,7 +392,7 @@ public abstract class PeerFinder {
             assert getDiscoveryNode() == null : "unexpectedly connected to " + getDiscoveryNode();
             assert active;
 
-            logger.trace("{} attempting connection", this);
+            logger.info("{} attempting connection", this);
             transportAddressConnector.connectToRemoteMasterNode(transportAddress, new ActionListener<DiscoveryNode>() {
                 @Override
                 public void onResponse(DiscoveryNode remoteNode) {
@@ -431,11 +431,11 @@ public abstract class PeerFinder {
             assert discoveryNode != null : "cannot request peers without first connecting";
 
             if (discoveryNode.equals(getLocalNode())) {
-                logger.trace("{} not requesting peers from local node", this);
+                logger.info("{} not requesting peers from local node", this);
                 return;
             }
 
-            logger.trace("{} requesting peers", this);
+            logger.info("{} requesting peers", this);
             peersRequestInFlight = true;
 
             final List<DiscoveryNode> knownNodes = getFoundPeersUnderLock();
@@ -449,7 +449,7 @@ public abstract class PeerFinder {
 
                 @Override
                 public void handleResponse(PeersResponse response) {
-                    logger.trace("{} received {}", Peer.this, response);
+                    logger.info("{} received {}", Peer.this, response);
                     synchronized (mutex) {
                         if (active == false) {
                             return;
