@@ -24,8 +24,8 @@ import java.util.stream.Collectors;
 import java.util.zip.CRC32;
 import java.util.zip.CheckedInputStream;
 
-import static org.opensearch.index.translog.transfer.FileSnapshot.TranslogFileSnapshot;
 import static org.opensearch.index.translog.transfer.FileSnapshot.CheckpointFileSnapshot;
+import static org.opensearch.index.translog.transfer.FileSnapshot.TranslogFileSnapshot;
 
 public class TransferSnapshotProvider implements Supplier<TransferSnapshot> {
 
@@ -100,11 +100,11 @@ public class TransferSnapshotProvider implements Supplier<TransferSnapshot> {
             return translogCheckpointFileInfoTupleSet.size() == size;
         }
 
-        public Set<FileSnapshot> getTranslogFileSnapshots() {
+        public Set<FileSnapshot.TransferFileSnapshot> getTranslogFileSnapshots() {
             return translogCheckpointFileInfoTupleSet.stream().map(tuple -> tuple.v1()).collect(Collectors.toSet());
         }
 
-        public Set<FileSnapshot> getCheckpointFileSnapshots() {
+        public Set<FileSnapshot.TransferFileSnapshot> getCheckpointFileSnapshots() {
             return translogCheckpointFileInfoTupleSet.stream().map(tuple -> tuple.v2()).collect(Collectors.toSet());
         }
 

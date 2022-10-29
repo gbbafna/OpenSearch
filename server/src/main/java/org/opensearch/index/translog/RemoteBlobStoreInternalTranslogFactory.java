@@ -9,7 +9,6 @@
 package org.opensearch.index.translog;
 
 import org.opensearch.cluster.service.ClusterService;
-import org.opensearch.common.blobstore.BlobPath;
 import org.opensearch.repositories.RepositoriesService;
 import org.opensearch.repositories.Repository;
 import org.opensearch.repositories.RepositoryMissingException;
@@ -52,10 +51,6 @@ public class RemoteBlobStoreInternalTranslogFactory implements TranslogFactory {
     ) throws IOException {
 
         assert repository instanceof BlobStoreRepository : "repository should be instance of BlobStoreRepository";
-        BlobPath blobPath = new BlobPath();
-        blobPath = blobPath.add(config.getShardId().getIndexName())
-            .add(String.valueOf(config.getShardId().getId()))
-            .add(String.valueOf(primaryTermSupplier.getAsLong()));
         BlobStoreRepository blobStoreRepository = ((BlobStoreRepository) repository);
         return new RemoteFsTranslog(
             config,

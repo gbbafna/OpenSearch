@@ -57,6 +57,7 @@ public class RemoteFsTranslog extends Translog {
             fileTransferTracker::exclusionFilter
         );
         try {
+            // Copy all  remote translog files to location
             final Checkpoint checkpoint = readCheckpoint(location);
             this.readers.addAll(recoverFromFiles(checkpoint));
             if (readers.isEmpty()) {
@@ -206,6 +207,11 @@ public class RemoteFsTranslog extends Translog {
                         logger.trace("Creating new writer for gen: [{}]", current.getGeneration() + 1);
                         current = createWriter(current.getGeneration() + 1);
                         logger.trace("current translog set to [{}]", current.getGeneration());
+                        if (generation == null ) {
+                            // ToDo : Verify the impact of not updating global checkpoint on remote txlog.
+                            logger.info("gbbafna - For checkpointing setting gen to {} ", current.getGeneration());
+                            return true;
+                        }
                     }
                 } catch (final Exception e) {
                     tragedy.setTragicException(e);
@@ -218,6 +224,7 @@ public class RemoteFsTranslog extends Translog {
     }
 
     private boolean upload(Long primaryTerm, Long generation) throws IOException {
+        logger.info("gbbafna uploading txlog for {} {} ", primaryTerm, generation);
         TransferSnapshotProvider transferSnapshotProvider = new TransferSnapshotProvider(primaryTerm, generation, this.location, readers);
         Releasable transferReleasable = Releasables.wrap(deletionPolicy.acquireTranslogGen(getMinFileGeneration()));
         return translogTransferManager.uploadTranslog(transferSnapshotProvider.get(), new TranslogTransferListener() {

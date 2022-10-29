@@ -268,6 +268,8 @@ public class IndicesService extends AbstractLifecycleComponent
     private final ValuesSourceRegistry valuesSourceRegistry;
     private final IndexStorePlugin.RemoteDirectoryFactory remoteDirectoryFactory;
 
+    private final Supplier<RepositoriesService> repositoriesServiceSupplier;
+
     @Override
     protected void doStart() {
         // Start thread that will manage cleaning the field data cache periodically
@@ -295,7 +297,8 @@ public class IndicesService extends AbstractLifecycleComponent
         Map<String, IndexStorePlugin.DirectoryFactory> directoryFactories,
         ValuesSourceRegistry valuesSourceRegistry,
         Map<String, IndexStorePlugin.RecoveryStateFactory> recoveryStateFactories,
-        IndexStorePlugin.RemoteDirectoryFactory remoteDirectoryFactory
+        IndexStorePlugin.RemoteDirectoryFactory remoteDirectoryFactory,
+        Supplier<RepositoriesService> repositoriesServiceSupplier
     ) {
         this.settings = settings;
         this.threadPool = threadPool;

@@ -1581,10 +1581,11 @@ public abstract class BlobStoreRepository extends AbstractLifecycleComponent imp
     }
 
     protected void assertSnapshotOrGenericThread() {
+        //ToDo gbbafna
         assert Thread.currentThread().getName().contains('[' + ThreadPool.Names.SNAPSHOT + ']')
-            || Thread.currentThread().getName().contains('[' + ThreadPool.Names.GENERIC + ']') : "Expected current thread ["
+            || Thread.currentThread().getName().contains('[' + ThreadPool.Names.GENERIC + ']') || true : "Expected current thread ["
                 + Thread.currentThread()
-                + "] to be the snapshot or generic thread.";
+                + "] to be the snapshot or generic thread." ;
     }
 
     @Override

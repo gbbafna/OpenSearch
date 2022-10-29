@@ -19,6 +19,7 @@ import org.opensearch.common.io.stream.BytesStreamOutput;
 import org.opensearch.index.translog.RemoteTranslogMetadata;
 import org.opensearch.index.translog.transfer.listener.FileTransferListener;
 import org.opensearch.index.translog.transfer.listener.TranslogTransferListener;
+
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -122,9 +123,9 @@ public class TranslogTransferManager {
             transferSnapshot.getGeneration(),
             transferSnapshot.getMinGeneration()
         );
-        assert transferSnapshot.getTranslogFileSnapshots() instanceof TranslogFileSnapshot;
+
         Map<String, String> generationPrimaryTermMap = transferSnapshot.getTranslogFileSnapshots().stream().map(s -> {
-            assert s instanceof TransferFileSnapshot;
+            assert s instanceof TranslogFileSnapshot;
             return (TranslogFileSnapshot) s;
         })
             .collect(
@@ -139,7 +140,7 @@ public class TranslogTransferManager {
             remoteTranslogMetadata.writeTo(output);
             try (
                 CheckedInputStream stream = new CheckedInputStream(
-                    new ByteArrayInputStream(output.bytes().streamInput().readByteArray()),
+                    new ByteArrayInputStream(output.bytes().streamInput().readAllBytes()),
                     new CRC32()
                 )
             ) {

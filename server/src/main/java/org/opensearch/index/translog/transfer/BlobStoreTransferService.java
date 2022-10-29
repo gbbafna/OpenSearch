@@ -11,6 +11,7 @@ package org.opensearch.index.translog.transfer;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.message.ParameterizedMessage;
+import org.apache.lucene.util.BytesRef;
 import org.opensearch.action.ActionListener;
 import org.opensearch.action.ActionRunnable;
 import org.opensearch.common.blobstore.BlobPath;
@@ -78,4 +79,10 @@ public class BlobStoreTransferService implements TransferService {
             throw ex;
         }
     }
+
+    public TransferFileSnapshot downloadFile(Iterable<String> remotePath) throws IOException {
+        return new TransferFileSnapshot("name",  1, BytesRef.EMPTY_BYTES, 1);
+    }
+
+
 }
