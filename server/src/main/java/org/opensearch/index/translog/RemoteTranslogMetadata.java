@@ -30,7 +30,7 @@ public class RemoteTranslogMetadata implements Writeable, Comparable<RemoteTrans
 
     private final SetOnce<Map<String, Object>> generationToPrimaryTermMapper = new SetOnce<>();
 
-    private static final String METADATA_SEPARATOR = "_";
+    public static final String METADATA_SEPARATOR = "_";
 
     public RemoteTranslogMetadata(long primaryTerm, long generation, long minTranslogGeneration) {
         this.primaryTerm = primaryTerm;
@@ -39,7 +39,7 @@ public class RemoteTranslogMetadata implements Writeable, Comparable<RemoteTrans
         this.timeStamp = System.currentTimeMillis();
     }
 
-    RemoteTranslogMetadata(StreamInput in) throws IOException {
+    public RemoteTranslogMetadata(StreamInput in) throws IOException {
         this.primaryTerm = in.readLong();
         this.generation = in.readLong();
         this.minTranslogGeneration = in.readLong();
@@ -61,6 +61,10 @@ public class RemoteTranslogMetadata implements Writeable, Comparable<RemoteTrans
 
     public void setGenerationToPrimaryTermMapper(Map<String, Object> generationToPrimaryTermMap) {
         generationToPrimaryTermMapper.set(generationToPrimaryTermMap);
+    }
+
+    public Map<String, Object> getGenerationToPrimaryTermMapper() {
+        return generationToPrimaryTermMapper.get();
     }
 
     public String getMetadataFileName() {

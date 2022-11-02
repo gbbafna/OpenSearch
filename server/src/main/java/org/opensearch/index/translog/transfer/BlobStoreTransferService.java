@@ -11,7 +11,6 @@ package org.opensearch.index.translog.transfer;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.message.ParameterizedMessage;
-import org.apache.lucene.util.BytesRef;
 import org.opensearch.action.ActionListener;
 import org.opensearch.action.ActionRunnable;
 import org.opensearch.common.blobstore.BlobPath;
@@ -21,6 +20,8 @@ import org.opensearch.threadpool.ThreadPool;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.util.Set;
 
 /**
  * Service that handles remote transfer of translog and checkpoint files
@@ -80,9 +81,11 @@ public class BlobStoreTransferService implements TransferService {
         }
     }
 
-    public TransferFileSnapshot downloadFile(Iterable<String> remotePath) throws IOException {
-        return new TransferFileSnapshot("name",  1, BytesRef.EMPTY_BYTES, 1);
+    public InputStream readBlob(BlobPath path, String blobName) throws IOException {
+        return blobStore.blobContainer(path).readBlob(blobName);
     }
 
-
+    public Set<String> listFiles(BlobPath path) throws IOException {
+        return blobStore.blobContainer(path).listBlobs().keySet();
+    }
 }

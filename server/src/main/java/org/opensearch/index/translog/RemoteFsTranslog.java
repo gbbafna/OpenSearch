@@ -8,6 +8,7 @@
 
 package org.opensearch.index.translog;
 
+import org.opensearch.common.collect.Tuple;
 import org.opensearch.common.lease.Releasable;
 import org.opensearch.common.lease.Releasables;
 import org.opensearch.common.util.concurrent.ReleasableLock;
@@ -22,10 +23,15 @@ import org.opensearch.repositories.blobstore.BlobStoreRepository;
 import org.opensearch.threadpool.ThreadPool;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.function.LongConsumer;
 import java.util.function.LongSupplier;
@@ -89,6 +95,33 @@ public class RemoteFsTranslog extends Translog {
             IOUtils.closeWhileHandlingException(readers);
             throw e;
         }
+    }
+
+    public RemoteFsTranslog(
+        RemoteTranslogMetadata remoteTranslogMetadata,
+        RemoteFsTranslog old
+    ) throws IOException {
+        super(old.config, old.translogUUID, old.deletionPolicy, old.globalCheckpointSupplier, old.primaryTermSupplier, old.persistedSequenceNumberConsumer);
+        this.blobStoreRepository = old.blobStoreRepository;
+        FileTransferTracker fileTransferTracker = new FileTransferTracker(shardId);
+        this.translogTransferManager = new TranslogTransferManager(
+            new BlobStoreTransferService(blobStoreRepository.blobStore(), old.blobStoreRepository.threadPool()),
+            blobStoreRepository.basePath().add(shardId.getIndex().getUUID()).add(String.valueOf(shardId.id())),
+            blobStoreRepository.basePath().add(shardId.getIndex().getUUID()).add(String.valueOf(shardId.id())).add(METADATA_DIR),
+            fileTransferTracker,
+            fileTransferTracker::exclusionFilter
+        );
+        try {
+            boolean success = false;
+            // Copy all  remote translog files to location
+            // which location for now?... same location
+
+            // Remove files not present
+        } finally {
+
+        }
+
+
     }
 
     /** recover all translog files found on disk */
@@ -232,6 +265,7 @@ public class RemoteFsTranslog extends Translog {
             public void onUploadComplete(TransferSnapshot transferSnapshot) throws IOException {
                 transferReleasable.close();
                 closeFilesIfNoPendingRetentionLocks();
+                updateReaders();
             }
 
             @Override
@@ -249,6 +283,65 @@ public class RemoteFsTranslog extends Translog {
             closeOnTragicEvent(ex);
             throw ex;
         }
+    }
+
+    public boolean updateReaders() throws IOException {
+        //recover all translog files found on remote translog
+        RemoteTranslogMetadata remoteTranslogMetadata = translogTransferManager.findLatestMetadata();
+        Map<String, Object>  generationToPrimaryTermMapper =  remoteTranslogMetadata.getGenerationToPrimaryTermMapper();
+
+        Set<Long> generations = new HashSet<>();
+        generationToPrimaryTermMapper.entrySet().stream()
+            .forEach(
+                genToTerm -> {
+                    generations.add(Long.parseLong(genToTerm.getKey(), Character.MAX_RADIX));
+                }
+            );
+
+        long maxGen = Collections.max(generations);
+        long maxPrimary = Long.parseLong((String) generationToPrimaryTermMapper.get(Long.toString(maxGen, Character.MAX_RADIX)));
+        logger.info("Highest gen and primary {} {}", maxGen, maxPrimary);
+        Tuple<byte[], byte[]> t2 =  translogTransferManager.readTranslogGen(maxPrimary, maxGen);
+        Path file2 = location.resolve(getCommitCheckpointFileName(maxGen));
+        //final Checkpoint earlierCheckpoint = Checkpoint.read(file2);
+        Files.deleteIfExists(file2);
+        final FileChannel channel2 = getChannelFactory().open(file2);
+        channel2.write(ByteBuffer.wrap(t2.v1()));
+        channel2.force(true);
+        final Checkpoint checkpoint = Checkpoint.read(file2);
+        logger.info("updated checkpoint {} {}", checkpoint);
+
+        generationToPrimaryTermMapper.entrySet().stream()
+        .forEach(
+            genToTerm -> {
+                Long gen = Long.parseLong(genToTerm.getKey(), Character.MAX_RADIX);
+                Long primary = Long.parseLong((String) genToTerm.getValue(), Character.MAX_RADIX);
+
+                try {
+                    Tuple<byte[], byte[]> t =  translogTransferManager.readTranslogGen(primary, gen);
+                    Path file = location.resolve(getFilename(gen));
+                    Files.deleteIfExists(file);
+                    final FileChannel channel = getChannelFactory().open(file);
+                    channel.write(ByteBuffer.wrap(t.v1()));
+                    channel.force(true);
+
+                    file = location.resolve(getCommitCheckpointFileName(gen));
+                    Files.deleteIfExists(file);
+                    final FileChannel ckpChannel = getChannelFactory().open(file);
+                    ckpChannel.write(ByteBuffer.wrap(t.v2()));
+                    ckpChannel.force(true);
+
+                    logger.info("reloading readers {}", this.readers.size());
+                    this.readers.clear();
+                    this.readers.addAll(recoverFromFiles(checkpoint));
+                    logger.info("reloaded readers {}", this.readers.size());
+
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+        );
+        return true;
     }
 
     @Override

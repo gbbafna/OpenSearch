@@ -15,13 +15,16 @@ import org.opensearch.ExceptionsHelper;
 import org.opensearch.action.ActionListener;
 import org.opensearch.action.LatchedActionListener;
 import org.opensearch.common.blobstore.BlobPath;
+import org.opensearch.common.collect.Tuple;
 import org.opensearch.common.io.stream.BytesStreamOutput;
+import org.opensearch.common.io.stream.InputStreamStreamInput;
 import org.opensearch.index.translog.RemoteTranslogMetadata;
 import org.opensearch.index.translog.transfer.listener.FileTransferListener;
 import org.opensearch.index.translog.transfer.listener.TranslogTransferListener;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -35,6 +38,8 @@ import java.util.stream.Collectors;
 import java.util.zip.CRC32;
 import java.util.zip.CheckedInputStream;
 
+import static org.opensearch.index.translog.Translog.getCommitCheckpointFileName;
+import static org.opensearch.index.translog.Translog.getFilename;
 import static org.opensearch.index.translog.transfer.FileSnapshot.TransferFileSnapshot;
 import static org.opensearch.index.translog.transfer.FileSnapshot.TranslogFileSnapshot;
 
@@ -105,6 +110,7 @@ public class TranslogTransferManager {
             }
             if (exceptionList.isEmpty()) {
                 transferService.uploadFile(prepareMetadata(translogCheckpointTransferSnapshot), remoteTransferMetadataPath);
+                findLatestMetadata();
                 translogTransferListener.onUploadComplete(translogCheckpointTransferSnapshot);
             } else {
                 translogTransferListener.onUploadFailed(translogCheckpointTransferSnapshot, ExceptionsHelper.multiple(exceptionList));
@@ -150,5 +156,34 @@ public class TranslogTransferManager {
             }
         }
         return fileSnapshot;
+    }
+
+    public RemoteTranslogMetadata  findLatestMetadata() throws IOException {
+
+        Set<String> files = transferService.listFiles(remoteTransferMetadataPath);
+        String lastFile = null;
+        long highestPrimary = -1;
+        long highestGen = -1;
+
+        for (String f : files) {
+            String[] metadataFile = f.split("_");
+            long p = Long.parseLong(metadataFile[0]);
+            long g = Long.parseLong(metadataFile[1]);
+            if (p >= highestPrimary && g > highestGen) {
+                lastFile = f;
+                highestPrimary = p;
+                highestGen = g;
+            }
+        }
+
+        InputStream blob = transferService.readBlob(remoteTransferMetadataPath, lastFile);
+        RemoteTranslogMetadata rtMD = new RemoteTranslogMetadata(new InputStreamStreamInput(blob));
+        return rtMD;
+    }
+
+    public Tuple<byte[], byte[]> readTranslogGen(Long primary, Long gen) throws IOException {
+        byte[] tlog = transferService.readBlob(remoteBaseTransferPath.add(String.valueOf(primary)), getFilename(gen)).readAllBytes();
+        byte[] ckp =  transferService.readBlob(remoteBaseTransferPath.add(String.valueOf(primary)), getCommitCheckpointFileName(gen)).readAllBytes();
+        return Tuple.tuple(tlog, ckp);
     }
 }
