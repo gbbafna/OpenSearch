@@ -30,6 +30,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
@@ -303,10 +304,9 @@ public class RemoteFsTranslog extends Translog {
         logger.info("Highest gen and primary {} {}", maxGen, maxPrimary);
         Tuple<byte[], byte[]> t2 =  translogTransferManager.readTranslogGen(maxPrimary, maxGen);
         Path file2 = location.resolve(getCommitCheckpointFileName(maxGen));
-        //final Checkpoint earlierCheckpoint = Checkpoint.read(file2);
         Files.deleteIfExists(file2);
         final FileChannel channel2 = getChannelFactory().open(file2);
-        channel2.write(ByteBuffer.wrap(t2.v1()));
+        channel2.write(ByteBuffer.wrap(t2.v2()));
         channel2.force(true);
         final Checkpoint checkpoint = Checkpoint.read(file2);
         logger.info("updated checkpoint {} {}", checkpoint);
@@ -330,18 +330,42 @@ public class RemoteFsTranslog extends Translog {
                     final FileChannel ckpChannel = getChannelFactory().open(file);
                     ckpChannel.write(ByteBuffer.wrap(t.v2()));
                     ckpChannel.force(true);
-
-                    logger.info("reloading readers {}", this.readers.size());
-                    this.readers.clear();
-                    this.readers.addAll(recoverFromFiles(checkpoint));
-                    logger.info("reloaded readers {}", this.readers.size());
-
                 } catch (IOException e) {
                     throw new RuntimeException(e);
                 }
             }
         );
+        reloadReaders(checkpoint);
+
         return true;
+    }
+
+    public void reloadReaders(Checkpoint checkpoint) throws IOException {
+        int oldSize = this.readers.size();
+
+        logger.info("reloading readers {}", this.readers.size());
+        ArrayList<Long> oldGens = new ArrayList<>();
+        ArrayList<Long> newGens = new ArrayList<>();
+        Iterator<TranslogReader> iterator = this.readers.iterator();
+        TranslogReader reader;
+        while (iterator.hasNext()) {
+            reader = iterator.next();
+            oldGens.add(reader.getCheckpoint().generation);
+        }
+
+        this.readers.clear();
+        this.readers.addAll(recoverFromFiles(checkpoint));
+
+        iterator = this.readers.iterator();
+        while (iterator.hasNext()) {
+            reader = iterator.next();
+            newGens.add(reader.getCheckpoint().generation);
+        }
+
+        assert(oldGens.equals(newGens));
+        assert(this.readers.size() == oldSize);
+
+        logger.info("reloaded readers {}", this.readers.size());
     }
 
     @Override
