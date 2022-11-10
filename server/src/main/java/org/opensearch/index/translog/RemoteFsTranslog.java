@@ -37,6 +37,13 @@ import java.util.concurrent.Callable;
 import java.util.function.LongConsumer;
 import java.util.function.LongSupplier;
 
+/**
+ * A Translog implementation which syncs local FS with a remote store
+ * The current impl uploads translog , ckp and metadata to remote store
+ * for every sync post syncing to disk. Post that, a new generation is
+ * created.
+ *
+ */
 public class RemoteFsTranslog extends Translog {
 
     private final BlobStoreRepository blobStoreRepository;
@@ -64,7 +71,7 @@ public class RemoteFsTranslog extends Translog {
             fileTransferTracker::exclusionFilter
         );
         try {
-            // Copy all  remote translog files to location
+            // ToDo : Copy all  remote translog files to location
             final Checkpoint checkpoint = readCheckpoint(location);
             this.readers.addAll(recoverFromFiles(checkpoint));
             if (readers.isEmpty()) {
@@ -96,33 +103,6 @@ public class RemoteFsTranslog extends Translog {
             IOUtils.closeWhileHandlingException(readers);
             throw e;
         }
-    }
-
-    public RemoteFsTranslog(
-        RemoteTranslogMetadata remoteTranslogMetadata,
-        RemoteFsTranslog old
-    ) throws IOException {
-        super(old.config, old.translogUUID, old.deletionPolicy, old.globalCheckpointSupplier, old.primaryTermSupplier, old.persistedSequenceNumberConsumer);
-        this.blobStoreRepository = old.blobStoreRepository;
-        FileTransferTracker fileTransferTracker = new FileTransferTracker(shardId);
-        this.translogTransferManager = new TranslogTransferManager(
-            new BlobStoreTransferService(blobStoreRepository.blobStore(), old.blobStoreRepository.threadPool()),
-            blobStoreRepository.basePath().add(shardId.getIndex().getUUID()).add(String.valueOf(shardId.id())),
-            blobStoreRepository.basePath().add(shardId.getIndex().getUUID()).add(String.valueOf(shardId.id())).add(METADATA_DIR),
-            fileTransferTracker,
-            fileTransferTracker::exclusionFilter
-        );
-        try {
-            boolean success = false;
-            // Copy all  remote translog files to location
-            // which location for now?... same location
-
-            // Remove files not present
-        } finally {
-
-        }
-
-
     }
 
     /** recover all translog files found on disk */
@@ -243,7 +223,7 @@ public class RemoteFsTranslog extends Translog {
                         logger.trace("current translog set to [{}]", current.getGeneration());
                         if (generation == null ) {
                             // ToDo : Verify the impact of not updating global checkpoint on remote txlog.
-                            logger.info("gbbafna - For checkpointing setting gen to {} ", current.getGeneration());
+                            logger.trace("For checkpointing setting gen to {} ", current.getGeneration());
                             return true;
                         }
                     }
