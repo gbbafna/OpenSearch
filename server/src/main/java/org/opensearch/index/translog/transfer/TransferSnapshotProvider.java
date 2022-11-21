@@ -121,7 +121,7 @@ public class TransferSnapshotProvider implements Supplier<TransferSnapshot> {
 
         @Override
         public long getGeneration() {
-            assert this.generation == highestGeneration;
+            //assert this.generation == highestGeneration;
             return latestTranslogFileSnapshot.getGeneration();
         }
 

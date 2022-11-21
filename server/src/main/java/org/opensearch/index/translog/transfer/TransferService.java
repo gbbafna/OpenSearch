@@ -9,7 +9,6 @@
 package org.opensearch.index.translog.transfer;
 
 import org.opensearch.action.ActionListener;
-import org.opensearch.common.blobstore.BlobPath;
 import org.opensearch.index.translog.transfer.FileSnapshot.TransferFileSnapshot;
 
 import java.io.IOException;
@@ -23,8 +22,8 @@ public interface TransferService {
 
     void uploadFile(final TransferFileSnapshot fileSnapshot, Iterable<String> remotePath) throws IOException;
 
-    Set<String> listFiles(BlobPath path) throws IOException;
+    Set<String> listAll(Iterable<String> path) throws IOException;
 
-    InputStream readBlob(BlobPath path, String blobName) throws IOException;
+    InputStream readFile(Iterable<String> path, String fileName) throws IOException;
 
 }

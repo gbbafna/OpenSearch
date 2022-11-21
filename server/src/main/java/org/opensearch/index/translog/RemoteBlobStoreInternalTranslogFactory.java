@@ -8,7 +8,6 @@
 
 package org.opensearch.index.translog;
 
-import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.repositories.RepositoriesService;
 import org.opensearch.repositories.Repository;
 import org.opensearch.repositories.RepositoryMissingException;
@@ -27,12 +26,12 @@ public class RemoteBlobStoreInternalTranslogFactory implements TranslogFactory {
 
     public RemoteBlobStoreInternalTranslogFactory(
         Supplier<RepositoriesService> repositoriesServiceSupplier,
-        ClusterService clusterService,
-        ThreadPool threadPool
+        ThreadPool threadPool,
+        String repositoryName
     ) {
         Repository repository;
         try {
-            repository = repositoriesServiceSupplier.get().repository("clusterUUID");
+            repository = repositoriesServiceSupplier.get().repository(repositoryName);
         } catch (RepositoryMissingException ex) {
             throw new IllegalArgumentException("Repository should be created before creating index with remote_store enabled setting", ex);
         }

@@ -81,11 +81,11 @@ public class BlobStoreTransferService implements TransferService {
         }
     }
 
-    public InputStream readBlob(BlobPath path, String blobName) throws IOException {
-        return blobStore.blobContainer(path).readBlob(blobName);
+    public InputStream readFile(Iterable<String> path, String fileName) throws IOException {
+        return blobStore.blobContainer((BlobPath) path).readBlob(fileName);
     }
 
-    public Set<String> listFiles(BlobPath path) throws IOException {
-        return blobStore.blobContainer(path).listBlobs().keySet();
+    public Set<String> listAll(Iterable<String> path) throws IOException {
+        return blobStore.blobContainer( (BlobPath) path).listBlobs().keySet();
     }
 }

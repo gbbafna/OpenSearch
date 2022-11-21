@@ -32,6 +32,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.function.LongConsumer;
@@ -40,7 +41,7 @@ import java.util.function.LongSupplier;
 /**
  * A Translog implementation which syncs local FS with a remote store
  * The current impl uploads translog , ckp and metadata to remote store
- * for every sync post syncing to disk. Post that, a new generation is
+ * for every sync, post syncing to disk. Post that, a new generation is
  * created.
  *
  */
@@ -49,6 +50,8 @@ public class RemoteFsTranslog extends Translog {
     private final BlobStoreRepository blobStoreRepository;
     private final TranslogTransferManager translogTransferManager;
     private final static String METADATA_DIR = "metadata";
+
+    private final FileTransferTracker fileTransferTracker;
 
     public RemoteFsTranslog(
         TranslogConfig config,
@@ -62,7 +65,7 @@ public class RemoteFsTranslog extends Translog {
     ) throws IOException {
         super(config, translogUUID, deletionPolicy, globalCheckpointSupplier, primaryTermSupplier, persistedSequenceNumberConsumer);
         this.blobStoreRepository = blobStoreRepository;
-        FileTransferTracker fileTransferTracker = new FileTransferTracker(shardId);
+        fileTransferTracker = new FileTransferTracker(shardId);
         this.translogTransferManager = new TranslogTransferManager(
             new BlobStoreTransferService(blobStoreRepository.blobStore(), threadPool),
             blobStoreRepository.basePath().add(shardId.getIndex().getUUID()).add(String.valueOf(shardId.id())),
@@ -71,7 +74,6 @@ public class RemoteFsTranslog extends Translog {
             fileTransferTracker::exclusionFilter
         );
         try {
-            // ToDo : Copy all  remote translog files to location
             final Checkpoint checkpoint = readCheckpoint(location);
             this.readers.addAll(recoverFromFiles(checkpoint));
             if (readers.isEmpty()) {
@@ -117,6 +119,7 @@ public class RemoteFsTranslog extends Translog {
             // the generation id we found in the lucene commit. This gives for better error messages if the wrong
             // translog was found.
             for (long i = checkpoint.generation; i >= minGenerationToRecoverFrom; i--) {
+                logger.info("recovering generation {}", i);
                 Path committedTranslogFile = location.resolve(Translog.getFilename(i));
                 if (Files.exists(committedTranslogFile) == false) {
                     throw new TranslogCorruptedException(
@@ -221,11 +224,6 @@ public class RemoteFsTranslog extends Translog {
                         logger.trace("Creating new writer for gen: [{}]", current.getGeneration() + 1);
                         current = createWriter(current.getGeneration() + 1);
                         logger.trace("current translog set to [{}]", current.getGeneration());
-                        if (generation == null ) {
-                            // ToDo : Verify the impact of not updating global checkpoint on remote txlog.
-                            logger.trace("For checkpointing setting gen to {} ", current.getGeneration());
-                            return true;
-                        }
                     }
                 } catch (final Exception e) {
                     tragedy.setTragicException(e);
@@ -233,20 +231,32 @@ public class RemoteFsTranslog extends Translog {
                     throw e;
                 }
             }
+            // ToDo : Do we need remote writes in sync fashion ?
+            // If we don't , we should swallow FileAlreadyExistsException
+            // and also verify for same during primary-primary relocation
+            // Writing remote in sync fashion doesn't hurt as global ckp update
+            // is not updated in remote translog.
+            if (generation == null) {
+                upload(primaryTerm, current.getGeneration() - 1) ;
+                //updateReaders();
+                return true;
+            } else {
+                return upload(primaryTerm, generation);
+            }
         }
-        return upload(primaryTerm, generation);
     }
 
     private boolean upload(Long primaryTerm, Long generation) throws IOException {
-        logger.info("gbbafna uploading txlog for {} {} ", primaryTerm, generation);
+        logger.trace("uploading translog for {} {} ", primaryTerm, generation);
         TransferSnapshotProvider transferSnapshotProvider = new TransferSnapshotProvider(primaryTerm, generation, this.location, readers);
         Releasable transferReleasable = Releasables.wrap(deletionPolicy.acquireTranslogGen(getMinFileGeneration()));
         return translogTransferManager.uploadTranslog(transferSnapshotProvider.get(), new TranslogTransferListener() {
             @Override
+
             public void onUploadComplete(TransferSnapshot transferSnapshot) throws IOException {
                 transferReleasable.close();
                 closeFilesIfNoPendingRetentionLocks();
-                updateReaders();
+                logger.trace("uploaded translog for {} {} ", primaryTerm, generation);
             }
 
             @Override
@@ -255,6 +265,11 @@ public class RemoteFsTranslog extends Translog {
                 closeFilesIfNoPendingRetentionLocks();
             }
         });
+    }
+
+    // Visible for testing
+    public Set<String> allUploaded() {
+        return fileTransferTracker.allUploaded();
     }
 
     private boolean syncToDisk() throws IOException {
@@ -268,7 +283,12 @@ public class RemoteFsTranslog extends Translog {
 
     public boolean updateReaders() throws IOException {
         //recover all translog files found on remote translog
-        RemoteTranslogMetadata remoteTranslogMetadata = translogTransferManager.findLatestMetadata();
+        Optional<RemoteTranslogMetadata> rtm = translogTransferManager.findLatestMetadata();
+        if (rtm.isEmpty()) {
+            logger.info("No translog metadata file found, this can happen for new index with no data uploaded to remote translog store");
+            return true;
+        }
+        RemoteTranslogMetadata remoteTranslogMetadata = rtm.get();
         Map<String, Object>  generationToPrimaryTermMapper =  remoteTranslogMetadata.getGenerationToPrimaryTermMapper();
 
         Set<Long> generations = new HashSet<>();
@@ -290,6 +310,7 @@ public class RemoteFsTranslog extends Translog {
         channel2.force(true);
         final Checkpoint checkpoint = Checkpoint.read(file2);
         logger.info("updated checkpoint {} {}", checkpoint);
+        logger.info("current checkpoint's generation {}", current.generation);
 
         generationToPrimaryTermMapper.entrySet().stream()
         .forEach(
@@ -321,8 +342,6 @@ public class RemoteFsTranslog extends Translog {
     }
 
     public void reloadReaders(Checkpoint checkpoint) throws IOException {
-        int oldSize = this.readers.size();
-
         logger.info("reloading readers {}", this.readers.size());
         ArrayList<Long> oldGens = new ArrayList<>();
         ArrayList<Long> newGens = new ArrayList<>();
@@ -342,15 +361,15 @@ public class RemoteFsTranslog extends Translog {
             newGens.add(reader.getCheckpoint().generation);
         }
 
-        assert(oldGens.equals(newGens));
-        assert(this.readers.size() == oldSize);
+        logger.info("Old gen {}", oldGens);
+        logger.info("New gen {}", newGens);
 
+        assert(oldGens.equals(newGens) ) : "Older gens size" + oldGens.size() + "New gens" + newGens.size();
         logger.info("reloaded readers {}", this.readers.size());
     }
 
     @Override
     public void sync() throws IOException {
-
         try {
             if (syncToDisk()) {
                 prepareAndUpload(primaryTermSupplier.getAsLong(), null);
@@ -371,6 +390,7 @@ public class RemoteFsTranslog extends Translog {
                 prepareAndUpload(primaryTermSupplier.getAsLong(), null);
             } finally {
                 logger.debug("translog closed");
+                closeFilesIfNoPendingRetentionLocks();
             }
         }
     }

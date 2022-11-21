@@ -8,6 +8,9 @@
 
 package org.opensearch.index.translog;
 
+import org.opensearch.common.util.concurrent.ReleasableLock;
+import org.opensearch.core.internal.io.IOUtils;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -15,9 +18,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.function.LongConsumer;
 import java.util.function.LongSupplier;
-
-import org.opensearch.common.util.concurrent.ReleasableLock;
-import org.opensearch.core.internal.io.IOUtils;
 
 public class LocalTranslog extends Translog {
 
@@ -49,8 +49,6 @@ public class LocalTranslog extends Translog {
         final LongConsumer persistedSequenceNumberConsumer
     ) throws IOException {
         super(config, translogUUID, deletionPolicy, globalCheckpointSupplier, primaryTermSupplier, persistedSequenceNumberConsumer);
-        Files.createDirectories(this.location);
-
         try {
             final Checkpoint checkpoint = readCheckpoint(location);
             final Path nextTranslogFile = location.resolve(getFilename(checkpoint.generation + 1));

@@ -91,6 +91,7 @@ import org.opensearch.index.store.Store;
 import org.opensearch.index.translog.InternalTranslogFactory;
 import org.opensearch.index.translog.RemoteBlobStoreInternalTranslogFactory;
 import org.opensearch.index.translog.Translog;
+import org.opensearch.index.translog.TranslogFactory;
 import org.opensearch.indices.breaker.CircuitBreakerService;
 import org.opensearch.indices.cluster.IndicesClusterStateService;
 import org.opensearch.indices.fielddata.cache.IndicesFieldDataCache;
@@ -523,6 +524,11 @@ public class IndexService extends AbstractIndexComponent implements IndicesClust
                 remoteStore = new Store(shardId, this.indexSettings, remoteDirectory, lock, Store.OnClose.EMPTY);
             }
 
+            TranslogFactory translogFactory = this.indexSettings.isRemoteTranslogStoreEnabled()
+                ? new RemoteBlobStoreInternalTranslogFactory(repositoriesServiceSupplier, threadPool,
+                this.indexSettings.getRemoteStoreTranslogRepository())
+                : new InternalTranslogFactory();
+
             Directory directory = directoryFactory.newDirectory(this.indexSettings, path);
             store = new Store(
                 shardId,
@@ -553,10 +559,7 @@ public class IndexService extends AbstractIndexComponent implements IndicesClust
                 () -> globalCheckpointSyncer.accept(shardId),
                 retentionLeaseSyncer,
                 circuitBreakerService,
-                // TODO Replace with remote translog factory in the follow up PR
-                this.indexSettings.isRemoteTranslogStoreEnabled()
-                    ? new RemoteBlobStoreInternalTranslogFactory(repositoriesServiceSupplier, clusterService, threadPool)
-                    : new InternalTranslogFactory(),
+                translogFactory,
                 this.indexSettings.isSegRepEnabled() ? checkpointPublisher : null,
                 remoteStore
             );

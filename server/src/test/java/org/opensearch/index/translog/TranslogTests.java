@@ -217,7 +217,7 @@ public class TranslogTests extends OpenSearchTestCase {
             shardId,
             primaryTerm.get()
         );
-        return new Translog(
+        return new LocalTranslog(
             config,
             translogUUID,
             createTranslogDeletionPolicy(config.getIndexSettings()),
@@ -228,7 +228,7 @@ public class TranslogTests extends OpenSearchTestCase {
     }
 
     protected Translog openTranslog(TranslogConfig config, String translogUUID) throws IOException {
-        return new Translog(
+        return new LocalTranslog(
             config,
             translogUUID,
             createTranslogDeletionPolicy(config.getIndexSettings()),
@@ -264,7 +264,7 @@ public class TranslogTests extends OpenSearchTestCase {
         final TranslogConfig translogConfig = getTranslogConfig(path);
         final TranslogDeletionPolicy deletionPolicy = createTranslogDeletionPolicy(translogConfig.getIndexSettings());
         final String translogUUID = Translog.createEmptyTranslog(path, SequenceNumbers.NO_OPS_PERFORMED, shardId, primaryTerm.get());
-        return new Translog(
+        return new LocalTranslog(
             translogConfig,
             translogUUID,
             deletionPolicy,
@@ -1515,7 +1515,7 @@ public class TranslogTests extends OpenSearchTestCase {
         );
 
         try (
-            Translog translog = new Translog(
+            Translog translog = new LocalTranslog(
                 config,
                 translogUUID,
                 new DefaultTranslogDeletionPolicy(-1, -1, 0),
@@ -1630,7 +1630,7 @@ public class TranslogTests extends OpenSearchTestCase {
         );
 
         try (
-            Translog translog = new Translog(
+            Translog translog = new LocalTranslog(
                 config,
                 translogUUID,
                 new DefaultTranslogDeletionPolicy(-1, -1, 0),
@@ -1736,7 +1736,7 @@ public class TranslogTests extends OpenSearchTestCase {
                 assertNull(snapshot.next());
             }
         } else {
-            translog = new Translog(
+            translog = new LocalTranslog(
                 config,
                 translogGeneration.translogUUID,
                 translog.getDeletionPolicy(),
@@ -1795,7 +1795,7 @@ public class TranslogTests extends OpenSearchTestCase {
         final String translogUUID = translog.getTranslogUUID();
         final TranslogDeletionPolicy deletionPolicy = translog.getDeletionPolicy();
         try (
-            Translog translog = new Translog(
+            Translog translog = new LocalTranslog(
                 config,
                 translogUUID,
                 deletionPolicy,
@@ -1822,7 +1822,7 @@ public class TranslogTests extends OpenSearchTestCase {
         }
         if (randomBoolean()) { // recover twice
             try (
-                Translog translog = new Translog(
+                Translog translog = new LocalTranslog(
                     config,
                     translogUUID,
                     deletionPolicy,
@@ -1884,7 +1884,7 @@ public class TranslogTests extends OpenSearchTestCase {
         final String translogUUID = translog.getTranslogUUID();
         final TranslogDeletionPolicy deletionPolicy = translog.getDeletionPolicy();
         try (
-            Translog translog = new Translog(
+            Translog translog = new LocalTranslog(
                 config,
                 translogUUID,
                 deletionPolicy,
@@ -1912,7 +1912,7 @@ public class TranslogTests extends OpenSearchTestCase {
 
         if (randomBoolean()) { // recover twice
             try (
-                Translog translog = new Translog(
+                Translog translog = new LocalTranslog(
                     config,
                     translogUUID,
                     deletionPolicy,
@@ -1976,7 +1976,7 @@ public class TranslogTests extends OpenSearchTestCase {
         final TranslogDeletionPolicy deletionPolicy = translog.getDeletionPolicy();
         final TranslogCorruptedException translogCorruptedException = expectThrows(
             TranslogCorruptedException.class,
-            () -> new Translog(config, translogUUID, deletionPolicy, () -> SequenceNumbers.NO_OPS_PERFORMED, primaryTerm::get, seqNo -> {})
+            () -> new LocalTranslog(config, translogUUID, deletionPolicy, () -> SequenceNumbers.NO_OPS_PERFORMED, primaryTerm::get, seqNo -> {})
         );
         assertThat(
             translogCorruptedException.getMessage(),
@@ -1995,7 +1995,7 @@ public class TranslogTests extends OpenSearchTestCase {
             StandardOpenOption.TRUNCATE_EXISTING
         );
         try (
-            Translog translog = new Translog(
+            Translog translog = new LocalTranslog(
                 config,
                 translogUUID,
                 deletionPolicy,
@@ -2293,7 +2293,7 @@ public class TranslogTests extends OpenSearchTestCase {
 
         final String foreignTranslog = randomRealisticUnicodeOfCodepointLengthBetween(1, translogGeneration.translogUUID.length());
         try {
-            new Translog(
+            new LocalTranslog(
                 config,
                 foreignTranslog,
                 createTranslogDeletionPolicy(),
@@ -2305,7 +2305,7 @@ public class TranslogTests extends OpenSearchTestCase {
         } catch (TranslogCorruptedException ex) {
 
         }
-        this.translog = new Translog(
+        this.translog = new LocalTranslog(
             config,
             translogUUID,
             deletionPolicy,
@@ -2535,7 +2535,7 @@ public class TranslogTests extends OpenSearchTestCase {
         final String translogUUID = translog.getTranslogUUID();
         final TranslogDeletionPolicy deletionPolicy = translog.getDeletionPolicy();
         try (
-            Translog tlog = new Translog(
+            Translog tlog = new LocalTranslog(
                 config,
                 translogUUID,
                 deletionPolicy,
@@ -2692,7 +2692,7 @@ public class TranslogTests extends OpenSearchTestCase {
             // drop all that haven't been synced
             writtenOperations.removeIf(next -> checkpoint.offset < (next.location.translogLocation + next.location.size));
             try (
-                Translog tlog = new Translog(
+                Translog tlog = new LocalTranslog(
                     config,
                     translogUUID,
                     createTranslogDeletionPolicy(),
@@ -2755,7 +2755,7 @@ public class TranslogTests extends OpenSearchTestCase {
         TranslogConfig config = translog.getConfig();
         final TranslogDeletionPolicy deletionPolicy = new DefaultTranslogDeletionPolicy(-1, -1, 0);
         deletionPolicy.setLocalCheckpointOfSafeCommit(localCheckpoint);
-        translog = new Translog(
+        translog = new LocalTranslog(
             config,
             translog.getTranslogUUID(),
             deletionPolicy,
@@ -2824,7 +2824,7 @@ public class TranslogTests extends OpenSearchTestCase {
         final TranslogDeletionPolicy deletionPolicy = new DefaultTranslogDeletionPolicy(-1, -1, 0);
         deletionPolicy.setLocalCheckpointOfSafeCommit(localCheckpoint);
         try (
-            Translog translog = new Translog(
+            Translog translog = new LocalTranslog(
                 config,
                 translogUUID,
                 deletionPolicy,
@@ -2934,7 +2934,7 @@ public class TranslogTests extends OpenSearchTestCase {
                 primaryTerm.get()
             );
         }
-        return new Translog(config, translogUUID, deletionPolicy, () -> SequenceNumbers.NO_OPS_PERFORMED, primaryTerm::get, seqNo -> {}) {
+        return new LocalTranslog(config, translogUUID, deletionPolicy, () -> SequenceNumbers.NO_OPS_PERFORMED, primaryTerm::get, seqNo -> {}) {
             @Override
             ChannelFactory getChannelFactory() {
                 return channelFactory;
@@ -3072,7 +3072,7 @@ public class TranslogTests extends OpenSearchTestCase {
         translog.add(new Translog.Index("boom", 0, primaryTerm.get(), "boom".getBytes(Charset.forName("UTF-8"))));
         translog.close();
         try {
-            new Translog(
+            new LocalTranslog(
                 config,
                 translog.getTranslogUUID(),
                 createTranslogDeletionPolicy(),
@@ -3140,7 +3140,7 @@ public class TranslogTests extends OpenSearchTestCase {
 
         TranslogException ex = expectThrows(
             TranslogException.class,
-            () -> new Translog(
+            () -> new LocalTranslog(
                 config,
                 translog.getTranslogUUID(),
                 translog.getDeletionPolicy(),
@@ -3167,7 +3167,7 @@ public class TranslogTests extends OpenSearchTestCase {
         // we add N+1 and N+2 to ensure we only delete the N+1 file and never jump ahead and wipe without the right condition
         Files.createFile(config.getTranslogPath().resolve("translog-" + (read.generation + 2) + ".tlog"));
         try (
-            Translog tlog = new Translog(
+            Translog tlog = new LocalTranslog(
                 config,
                 translogUUID,
                 deletionPolicy,
@@ -3189,7 +3189,7 @@ public class TranslogTests extends OpenSearchTestCase {
 
         TranslogException ex = expectThrows(
             TranslogException.class,
-            () -> new Translog(config, translogUUID, deletionPolicy, () -> SequenceNumbers.NO_OPS_PERFORMED, primaryTerm::get, seqNo -> {})
+            () -> new LocalTranslog(config, translogUUID, deletionPolicy, () -> SequenceNumbers.NO_OPS_PERFORMED, primaryTerm::get, seqNo -> {})
         );
         assertEquals(ex.getMessage(), "failed to create new translog file");
         assertEquals(ex.getCause().getClass(), FileAlreadyExistsException.class);
@@ -3312,7 +3312,7 @@ public class TranslogTests extends OpenSearchTestCase {
                 );
             }
             try (
-                Translog translog = new Translog(
+                Translog translog = new LocalTranslog(
                     config,
                     generationUUID,
                     deletionPolicy,
@@ -3407,7 +3407,7 @@ public class TranslogTests extends OpenSearchTestCase {
         final String translogUUID = translog.getTranslogUUID();
         final TranslogDeletionPolicy deletionPolicy = createTranslogDeletionPolicy(config.getIndexSettings());
         translog.close();
-        translog = new Translog(
+        translog = new LocalTranslog(
             config,
             translogUUID,
             deletionPolicy,
@@ -3421,7 +3421,7 @@ public class TranslogTests extends OpenSearchTestCase {
         translog.add(new Translog.Index("3", 2, primaryTerm.get(), new byte[] { 3 }));
         translog.close();
         IOUtils.close(lock);
-        translog = new Translog(
+        translog = new LocalTranslog(
             config,
             translogUUID,
             deletionPolicy,
@@ -3780,7 +3780,7 @@ public class TranslogTests extends OpenSearchTestCase {
     // close method should never be called directly from Translog (the only exception is closeOnTragicEvent)
     public void testTranslogCloseInvariant() throws IOException {
         assumeTrue("test only works with assertions enabled", Assertions.ENABLED);
-        class MisbehavingTranslog extends Translog {
+        class MisbehavingTranslog extends LocalTranslog {
             MisbehavingTranslog(
                 TranslogConfig config,
                 String translogUUID,
@@ -3923,7 +3923,7 @@ public class TranslogTests extends OpenSearchTestCase {
             assertFalse(brokenTranslog.isOpen());
 
             try (
-                Translog recoveredTranslog = new Translog(
+                Translog recoveredTranslog = new LocalTranslog(
                     getTranslogConfig(path),
                     brokenTranslog.getTranslogUUID(),
                     brokenTranslog.getDeletionPolicy(),
@@ -3957,7 +3957,7 @@ public class TranslogTests extends OpenSearchTestCase {
             }
         };
         try (
-            Translog translog = new Translog(
+            Translog translog = new LocalTranslog(
                 config,
                 translogUUID,
                 createTranslogDeletionPolicy(config.getIndexSettings()),
@@ -4038,7 +4038,7 @@ public class TranslogTests extends OpenSearchTestCase {
             channelFactory,
             primaryTerm.get()
         );
-        final Translog translog = new Translog(
+        final Translog translog = new LocalTranslog(
             config,
             translogUUID,
             createTranslogDeletionPolicy(),

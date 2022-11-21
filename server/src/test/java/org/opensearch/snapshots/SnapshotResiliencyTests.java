@@ -1795,6 +1795,8 @@ public class SnapshotResiliencyTests extends OpenSearchTestCase {
                 );
                 final BigArrays bigArrays = new BigArrays(new PageCacheRecycler(settings), null, "test");
                 final MapperRegistry mapperRegistry = new IndicesModule(Collections.emptyList()).getMapperRegistry();
+                final SetOnce<RepositoriesService> repositoriesServiceReference = new SetOnce<>();
+                repositoriesServiceReference.set(repositoriesService);
                 indicesService = new IndicesService(
                     settings,
                     mock(PluginsService.class),
@@ -1827,7 +1829,8 @@ public class SnapshotResiliencyTests extends OpenSearchTestCase {
                     emptyMap(),
                     null,
                     emptyMap(),
-                    new RemoteSegmentStoreDirectoryFactory(() -> repositoriesService)
+                    new RemoteSegmentStoreDirectoryFactory(() -> repositoriesService),
+                    repositoriesServiceReference::get
                 );
                 final RecoverySettings recoverySettings = new RecoverySettings(settings, clusterSettings);
                 snapshotShardsService = new SnapshotShardsService(

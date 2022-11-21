@@ -12,6 +12,7 @@ import org.opensearch.index.shard.ShardId;
 import org.opensearch.index.translog.transfer.FileSnapshot.TransferFileSnapshot;
 import org.opensearch.index.translog.transfer.listener.FileTransferListener;
 
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -53,6 +54,16 @@ public class FileTransferTracker implements FileTransferListener {
         return original.stream()
             .filter(fileSnapshot -> fileTransferTracker.get(fileSnapshot.getName()) != TransferState.SUCCESS)
             .collect(Collectors.toSet());
+    }
+
+    public Set<String> allUploaded() {
+        Set<String> successFileTransferTracker = new HashSet<>();
+        fileTransferTracker.forEach( (k, v) -> {
+            if (v == TransferState.SUCCESS) {
+                successFileTransferTracker.add(k);
+            }
+        });
+        return successFileTransferTracker;
     }
 
     public enum TransferState {

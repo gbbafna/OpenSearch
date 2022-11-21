@@ -188,6 +188,7 @@ public abstract class Translog extends AbstractIndexShardComponent implements In
         readLock = new ReleasableLock(rwl.readLock());
         writeLock = new ReleasableLock(rwl.writeLock());
         this.location = config.getTranslogPath();
+        Files.createDirectories(this.location);
     }
 
     protected void copyCheckpointTo(Path targetPath) throws IOException {
