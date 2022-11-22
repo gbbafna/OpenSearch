@@ -387,7 +387,9 @@ public class RemoteFsTranslog extends Translog {
             : "Translog.close method is called from inside Translog, but not via closeOnTragicEvent method";
         if (closed.compareAndSet(false, true)) {
             try (ReleasableLock lock = writeLock.acquire()) {
-                prepareAndUpload(primaryTermSupplier.getAsLong(), null);
+                if (current.syncNeeded()) {
+                    prepareAndUpload(primaryTermSupplier.getAsLong(), null);
+                }
             } finally {
                 logger.debug("translog closed");
                 closeFilesIfNoPendingRetentionLocks();

@@ -2373,7 +2373,7 @@ public class TranslogTests extends OpenSearchTestCase {
         }
     }
 
-    private class TranslogThread extends Thread {
+     class TranslogThread extends Thread {
         private final CountDownLatch downLatch;
         private final int opsPerThread;
         private final int threadId;

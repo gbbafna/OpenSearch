@@ -82,6 +82,7 @@ public class TranslogTransferManager {
             toUpload.addAll(exclusionFilter.apply(translogCheckpointTransferSnapshot.getCheckpointFileSnapshots()));
             if (toUpload.isEmpty()) {
                 logger.warn("Nothing to upload for transfer size {}", translogCheckpointTransferSnapshot.getTransferSize());
+                translogTransferListener.onUploadComplete(translogCheckpointTransferSnapshot);
                 return true;
             }
             final CountDownLatch latch = new CountDownLatch(toUpload.size());
