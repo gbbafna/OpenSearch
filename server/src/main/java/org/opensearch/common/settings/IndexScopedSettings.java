@@ -226,7 +226,7 @@ public final class IndexScopedSettings extends AbstractScopedSettings {
         List.of(
             IndexMetadata.INDEX_REMOTE_STORE_ENABLED_SETTING,
             IndexMetadata.INDEX_REMOTE_TRANSLOG_STORE_ENABLED_SETTING,
-            IndexMetadata.INDEX_REMOTE_STORE_REPOSITORY_SETTING
+            IndexMetadata.INDEX_REMOTE_TRANSLOG_REPOSITORY_SETTING
         ),
         FeatureFlags.SEARCHABLE_SNAPSHOT,
         List.of(

@@ -673,7 +673,8 @@ public class Node implements Closeable {
                 Map.copyOf(directoryFactories),
                 searchModule.getValuesSourceRegistry(),
                 recoveryStateFactories,
-                remoteDirectoryFactory
+                remoteDirectoryFactory,
+                repositoriesServiceReference::get
             );
 
             final AliasValidator aliasValidator = new AliasValidator();
