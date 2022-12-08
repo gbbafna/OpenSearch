@@ -8,6 +8,7 @@
 
 package org.opensearch.index.translog;
 
+import org.opensearch.common.io.FileSystemUtils;
 import org.opensearch.common.lease.Releasable;
 import org.opensearch.common.lease.Releasables;
 import org.opensearch.common.util.concurrent.ReleasableLock;
@@ -25,6 +26,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
@@ -103,6 +105,7 @@ public class RemoteFsTranslog extends Translog {
     public static void downloadTranslogFiles(TranslogTransferManager translogTransferManager, Path location) throws IOException {
         TranslogTransferMetadata translogMetadata = translogTransferManager.readRemoteTranslogMetadata();
         if(translogMetadata != null) {
+            Arrays.stream(FileSystemUtils.files(location)).forEach(p -> p.toFile().delete());
             Map<String, String> generationToPrimaryTermMapper = translogMetadata.getGenerationToPrimaryTermMapper();
             for (long i = translogMetadata.getGeneration(); i >= translogMetadata.getMinTranslogGeneration(); i--) {
                 String generation = Long.toString(i);
