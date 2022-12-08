@@ -17,6 +17,7 @@ import org.opensearch.index.translog.transfer.FileTransferTracker;
 import org.opensearch.index.translog.transfer.TransferSnapshot;
 import org.opensearch.index.translog.transfer.TranslogCheckpointTransferSnapshot;
 import org.opensearch.index.translog.transfer.TranslogTransferManager;
+import org.opensearch.index.translog.transfer.TranslogTransferMetadata;
 import org.opensearch.index.translog.transfer.listener.TranslogTransferListener;
 import org.opensearch.repositories.blobstore.BlobStoreRepository;
 
@@ -25,6 +26,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
@@ -64,6 +66,7 @@ public class RemoteFsTranslog extends Translog {
             fileTransferTracker::exclusionFilter
         );
         try {
+            downloadTranslogFiles(translogTransferManager, location);
             final Checkpoint checkpoint = readCheckpoint(location);
             this.readers.addAll(recoverFromFiles(checkpoint));
             if (readers.isEmpty()) {
@@ -94,6 +97,17 @@ public class RemoteFsTranslog extends Translog {
             IOUtils.closeWhileHandlingException(current);
             IOUtils.closeWhileHandlingException(readers);
             throw e;
+        }
+    }
+
+    public static void downloadTranslogFiles(TranslogTransferManager translogTransferManager, Path location) throws IOException {
+        TranslogTransferMetadata translogMetadata = translogTransferManager.readRemoteTranslogMetadata();
+        if(translogMetadata != null) {
+            Map<String, String> generationToPrimaryTermMapper = translogMetadata.getGenerationToPrimaryTermMapper();
+            for (long i = translogMetadata.getGeneration(); i >= translogMetadata.getMinTranslogGeneration(); i--) {
+                String generation = Long.toString(i);
+                translogTransferManager.downloadTranslog(generationToPrimaryTermMapper.get(generation), generation, location, i == translogMetadata.getGeneration());
+            }
         }
     }
 

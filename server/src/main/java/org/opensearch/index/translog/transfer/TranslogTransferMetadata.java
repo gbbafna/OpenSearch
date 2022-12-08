@@ -10,10 +10,14 @@ package org.opensearch.index.translog.transfer;
 
 import org.apache.lucene.codecs.CodecUtil;
 import org.apache.lucene.store.DataOutput;
+import org.apache.lucene.store.InputStreamDataInput;
 import org.apache.lucene.store.OutputStreamIndexOutput;
 import org.apache.lucene.util.SetOnce;
 import org.opensearch.common.bytes.BytesReference;
+import org.opensearch.common.io.stream.BytesStreamInput;
 import org.opensearch.common.io.stream.BytesStreamOutput;
+import org.opensearch.common.io.stream.StreamInput;
+import org.opensearch.common.lucene.store.InputStreamIndexInput;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -37,7 +41,7 @@ public class TranslogTransferMetadata {
 
     private final long timeStamp;
 
-    private final int count;
+    private int count;
 
     private final SetOnce<Map<String, String>> generationToPrimaryTermMapper = new SetOnce<>();
 
@@ -55,6 +59,16 @@ public class TranslogTransferMetadata {
         this.minTranslogGeneration = minTranslogGeneration;
         this.timeStamp = System.currentTimeMillis();
         this.count = count;
+    }
+
+    public TranslogTransferMetadata(StreamInput in) throws IOException {
+        InputStreamDataInput inputStreamDataInput = new InputStreamDataInput(in);
+        CodecUtil.checkHeader(inputStreamDataInput, METADATA_CODEC, CURRENT_VERSION, CURRENT_VERSION);
+        this.primaryTerm = inputStreamDataInput.readLong();
+        this.generation = inputStreamDataInput.readLong();
+        this.minTranslogGeneration = inputStreamDataInput.readLong();
+        this.timeStamp = inputStreamDataInput.readLong();
+        this.generationToPrimaryTermMapper.set(inputStreamDataInput.readMapOfStrings());
     }
 
     public long getPrimaryTerm() {
@@ -75,6 +89,10 @@ public class TranslogTransferMetadata {
 
     public void setGenerationToPrimaryTermMapper(Map<String, String> generationToPrimaryTermMap) {
         generationToPrimaryTermMapper.set(generationToPrimaryTermMap);
+    }
+
+    public Map<String, String> getGenerationToPrimaryTermMapper() {
+        return generationToPrimaryTermMapper.get();
     }
 
     public String getFileName() {

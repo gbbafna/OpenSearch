@@ -14,11 +14,16 @@ import org.apache.logging.log4j.message.ParameterizedMessage;
 import org.opensearch.action.ActionListener;
 import org.opensearch.action.LatchedActionListener;
 import org.opensearch.common.blobstore.BlobPath;
+import org.opensearch.common.io.stream.InputStreamStreamInput;
 import org.opensearch.index.translog.transfer.listener.FileTransferListener;
 import org.opensearch.index.translog.transfer.listener.TranslogTransferListener;
 
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -126,6 +131,47 @@ public class TranslogTransferManager {
             translogTransferListener.onUploadFailed(transferSnapshot, ex);
             return false;
         }
+    }
+
+    public boolean downloadTranslog(String primaryTerm, String generation, Path location, boolean latest) throws IOException {
+        logger.info("Downloading translog files with: Primry Term = {}, Generation = {}, Location = {}", primaryTerm, generation, location);
+        try(InputStream translogFileInputStream = transferService.readFile(remoteBaseTransferPath.add(primaryTerm), "translog-" + generation + ".tlog")) {
+            String filename = "translog-" + generation + ".tlog";
+            try(FileOutputStream fileOutputStream = new FileOutputStream(String.valueOf(location.resolve(filename)))) {
+                fileOutputStream.write(translogFileInputStream.readAllBytes());
+            }
+        }
+        try(InputStream checkpointFileInputStream = transferService.readFile(remoteBaseTransferPath.add(primaryTerm), "translog-" + generation + ".ckp")) {
+            String filename = "translog-" + generation + ".ckp";
+            if(latest) {
+                filename = "translog.ckp";
+            }
+            try(FileOutputStream fileOutputStream = new FileOutputStream(String.valueOf(location.resolve(filename)))) {
+                fileOutputStream.write(checkpointFileInputStream.readAllBytes());
+            }
+        }
+        return true;
+    }
+
+    public TranslogTransferMetadata readRemoteTranslogMetadata() throws IOException {
+        List<String> metadataFilenames = new ArrayList<>(transferService.listAll(remoteMetadaTransferPath));
+        if(!metadataFilenames.isEmpty()) {
+            metadataFilenames.sort((o1, o2) -> {
+                String[] tokens1 = o1.split("__");
+                String[] tokens2 = o2.split("__");
+                if(Long.parseLong(tokens1[1]) == Long.parseLong(tokens2[1])) {
+                    if(Long.parseLong(tokens1[2]) == Long.parseLong(tokens2[2])) {
+                        return (int) (Long.parseLong(tokens1[3]) - Long.parseLong(tokens2[3]));
+                    } else {
+                        return (int) (Long.parseLong(tokens1[2]) - Long.parseLong(tokens2[2]));
+                    }
+                } else {
+                    return (int) (Long.parseLong(tokens1[1]) - Long.parseLong(tokens2[1]));
+                }
+            });
+            return new TranslogTransferMetadata(new InputStreamStreamInput(transferService.readFile(remoteMetadaTransferPath, metadataFilenames.get(metadataFilenames.size() - 1))));
+        }
+        return null;
     }
 
     private TransferFileSnapshot prepareMetadata(TransferSnapshot transferSnapshot) throws IOException {
