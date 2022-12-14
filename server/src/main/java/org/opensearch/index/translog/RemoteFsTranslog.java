@@ -68,11 +68,12 @@ public class RemoteFsTranslog extends Translog {
             fileTransferTracker::exclusionFilter
         );
         try {
-            downloadTranslogFiles(translogTransferManager, location);
-            final Checkpoint checkpoint = readCheckpoint(location);
-            this.readers.addAll(recoverFromFiles(checkpoint));
-            if (readers.isEmpty()) {
-                throw new IllegalStateException("at least one reader must be recovered");
+            Checkpoint checkpoint;
+            try {
+                checkpoint = readCheckpointAndRecoverFromFiles();
+            } catch(Exception e) {
+                download(translogTransferManager, location);
+                checkpoint = readCheckpointAndRecoverFromFiles();
             }
 
             boolean success = false;
@@ -102,10 +103,21 @@ public class RemoteFsTranslog extends Translog {
         }
     }
 
-    public static void downloadTranslogFiles(TranslogTransferManager translogTransferManager, Path location) throws IOException {
+    private Checkpoint readCheckpointAndRecoverFromFiles() throws IOException {
+        final Checkpoint checkpoint = readCheckpoint(location);
+        this.readers.addAll(recoverFromFiles(checkpoint));
+        if (readers.isEmpty()) {
+            throw new IllegalStateException("at least one reader must be recovered");
+        }
+        return checkpoint;
+    }
+
+    public static void download(TranslogTransferManager translogTransferManager, Path location) throws IOException {
         TranslogTransferMetadata translogMetadata = translogTransferManager.readRemoteTranslogMetadata();
         if(translogMetadata != null) {
+            // Delete translog files on local before downloading from remote
             Arrays.stream(FileSystemUtils.files(location)).forEach(p -> p.toFile().delete());
+
             Map<String, String> generationToPrimaryTermMapper = translogMetadata.getGenerationToPrimaryTermMapper();
             for (long i = translogMetadata.getGeneration(); i >= translogMetadata.getMinTranslogGeneration(); i--) {
                 String generation = Long.toString(i);

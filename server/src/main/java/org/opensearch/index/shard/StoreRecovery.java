@@ -60,8 +60,6 @@ import org.opensearch.index.mapper.MapperService;
 import org.opensearch.index.seqno.SequenceNumbers;
 import org.opensearch.index.snapshots.IndexShardRestoreFailedException;
 import org.opensearch.index.store.Store;
-import org.opensearch.index.translog.InternalTranslogManager;
-import org.opensearch.index.translog.RemoteBlobStoreInternalTranslogFactory;
 import org.opensearch.index.translog.RemoteFsTranslog;
 import org.opensearch.index.translog.Translog;
 import org.opensearch.index.translog.transfer.BlobStoreTransferService;
@@ -474,9 +472,6 @@ final class StoreRecovery {
             for (String file : remoteDirectory.listAll()) {
                 storeDirectory.copyFrom(remoteDirectory, file, file, IOContext.DEFAULT);
             }
-            // This creates empty trans-log for now
-            // ToDo: Add code to restore from remote trans-log
-            //bootstrap(indexShard, store);
 
             FileTransferTracker fileTransferTracker = new FileTransferTracker(shardId);
             BlobStoreRepository blobStoreRepository = (BlobStoreRepository) repository;
@@ -486,7 +481,7 @@ final class StoreRecovery {
                 fileTransferTracker,
                 fileTransferTracker::exclusionFilter
             );
-            RemoteFsTranslog.downloadTranslogFiles(translogTransferManager, indexShard.shardPath().resolveTranslog());
+            RemoteFsTranslog.download(translogTransferManager, indexShard.shardPath().resolveTranslog());
 
             assert indexShard.shardRouting.primary() : "only primary shards can recover from store";
             indexShard.recoveryState().getIndex().setFileDetailsComplete();
