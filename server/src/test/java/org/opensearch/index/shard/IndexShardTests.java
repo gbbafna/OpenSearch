@@ -62,6 +62,7 @@ import org.opensearch.action.index.IndexRequest;
 import org.opensearch.action.support.PlainActionFuture;
 import org.opensearch.cluster.metadata.IndexMetadata;
 import org.opensearch.cluster.metadata.MappingMetadata;
+import org.opensearch.cluster.metadata.RepositoryMetadata;
 import org.opensearch.cluster.node.DiscoveryNode;
 import org.opensearch.cluster.routing.AllocationId;
 import org.opensearch.cluster.routing.IndexShardRoutingTable;
@@ -82,8 +83,10 @@ import org.opensearch.common.io.stream.BytesStreamOutput;
 import org.opensearch.common.io.stream.StreamInput;
 import org.opensearch.common.lease.Releasable;
 import org.opensearch.common.lease.Releasables;
+import org.opensearch.common.settings.ClusterSettings;
 import org.opensearch.common.settings.IndexScopedSettings;
 import org.opensearch.common.settings.Settings;
+import org.opensearch.common.unit.ByteSizeUnit;
 import org.opensearch.common.unit.TimeValue;
 import org.opensearch.common.util.concurrent.AbstractRunnable;
 import org.opensearch.common.util.concurrent.AtomicArray;
@@ -92,6 +95,7 @@ import org.opensearch.common.xcontent.NamedXContentRegistry;
 import org.opensearch.common.xcontent.XContentBuilder;
 import org.opensearch.common.xcontent.XContentFactory;
 import org.opensearch.common.xcontent.XContentType;
+import org.opensearch.env.Environment;
 import org.opensearch.env.NodeEnvironment;
 import org.opensearch.index.IndexSettings;
 import org.opensearch.index.codec.CodecService;
@@ -137,12 +141,15 @@ import org.opensearch.index.translog.listener.TranslogEventListener;
 import org.opensearch.indices.IndicesQueryCache;
 import org.opensearch.indices.breaker.NoneCircuitBreakerService;
 import org.opensearch.indices.fielddata.cache.IndicesFieldDataCache;
+import org.opensearch.indices.recovery.RecoverySettings;
 import org.opensearch.indices.recovery.RecoveryState;
 import org.opensearch.indices.recovery.RecoveryTarget;
 import org.opensearch.indices.replication.checkpoint.SegmentReplicationCheckpointPublisher;
 import org.opensearch.indices.replication.common.ReplicationLuceneIndex;
 import org.opensearch.indices.replication.common.ReplicationType;
 import org.opensearch.repositories.IndexId;
+import org.opensearch.repositories.blobstore.BlobStoreTestUtil;
+import org.opensearch.repositories.fs.FsRepository;
 import org.opensearch.snapshots.Snapshot;
 import org.opensearch.snapshots.SnapshotId;
 import org.opensearch.test.CorruptionUtils;
@@ -2736,6 +2743,95 @@ public class IndexShardTests extends IndexShardTestCase {
         closeShards(target);
     }
 
+    public void testRestoreShardFromRemoteStoreAndRemoteTranslog() throws IOException {
+        Path repo = createTempDir();
+        Settings settings = Settings.builder()
+            .put(Environment.PATH_HOME_SETTING.getKey(), createTempDir().toAbsolutePath())
+            .put(Environment.PATH_REPO_SETTING.getKey(), repo.toAbsolutePath())
+            .putList(Environment.PATH_DATA_SETTING.getKey(), tmpPaths())
+            .put("location", repo)
+            .put("compress", randomBoolean())
+            .put("chunk_size", randomIntBetween(100, 1000), ByteSizeUnit.BYTES)
+            .build();
+
+        RepositoryMetadata metadata = new RepositoryMetadata("test-repo", "fs", settings);
+        FsRepository repository = new FsRepository(
+            metadata,
+            new Environment(settings, null),
+            NamedXContentRegistry.EMPTY,
+            BlobStoreTestUtil.mockClusterService(),
+            new RecoverySettings(settings, new ClusterSettings(settings, ClusterSettings.BUILT_IN_CLUSTER_SETTINGS))
+        );
+        repository.start();
+
+        IndexShard target = newStartedShard(
+            true,
+            Settings.builder().put(IndexMetadata.SETTING_REMOTE_STORE_ENABLED, true).
+                put(IndexMetadata.SETTING_REMOTE_TRANSLOG_STORE_ENABLED, true).
+                put(IndexMetadata.SETTING_REMOTE_TRANSLOG_STORE_REPOSITORY, "test-repo").build(),
+            new InternalEngineFactory()
+        );
+
+        indexDoc(target, "_doc", "1");
+        indexDoc(target, "_doc", "2");
+        target.refresh("test");
+        assertDocs(target, "1", "2");
+        flushShard(target);
+        indexDoc(target, "_doc", "3");
+        indexDoc(target, "_doc", "4");
+
+        ShardRouting routing = ShardRoutingHelper.initWithSameId(
+            target.routingEntry(),
+            RecoverySource.ExistingStoreRecoverySource.INSTANCE
+        );
+        routing = ShardRoutingHelper.newWithRestoreSource(
+            routing,
+            new RecoverySource.RemoteStoreRecoverySource(
+                UUIDs.randomBase64UUID(),
+                Version.CURRENT,
+                new IndexId("test", UUIDs.randomBase64UUID(random()))
+            )
+        );
+
+        // Delete files in store directory to restore from remote directory
+        Directory storeDirectory = target.store().directory();
+        for (String file : storeDirectory.listAll()) {
+            storeDirectory.deleteFile(file);
+        }
+
+        assertEquals(0, storeDirectory.listAll().length);
+
+        Directory remoteDirectory = ((FilterDirectory) ((FilterDirectory) target.remoteStore().directory()).getDelegate()).getDelegate();
+
+        // extra0 file is added as a part of https://lucene.apache.org/core/7_2_1/test-framework/org/apache/lucene/mockfile/ExtrasFS.html
+        // Safe to remove without impacting the test
+        for (String file : remoteDirectory.listAll()) {
+            if (ExtrasFS.isExtra(file)) {
+                remoteDirectory.deleteFile(file);
+            }
+        }
+
+        target.remoteStore().incRef();
+        try {
+            target = reinitShard(target, routing);
+        } catch(Throwable t) {
+            target = reinitShard(target, routing);
+        }
+
+        DiscoveryNode localNode = new DiscoveryNode("foo", buildNewFakeTransportAddress(), emptyMap(), emptySet(), Version.CURRENT);
+        target.markAsRecovering("remote_store", new RecoveryState(routing, localNode, null));
+        final PlainActionFuture<Boolean> future = PlainActionFuture.newFuture();
+        target.restoreFromRemoteStore(repository, future);
+        target.remoteStore().decRef();
+
+        assertTrue(future.actionGet());
+        assertDocs(target, "1", "2", "3", "4");
+
+        storeDirectory = ((FilterDirectory) ((FilterDirectory) target.store().directory()).getDelegate()).getDelegate();
+        ((BaseDirectoryWrapper) storeDirectory).setCheckIndexOnClose(false);
+        closeShards(target);
+    }
+
     public void testRestoreShardFromRemoteStore() throws IOException {
         IndexShard target = newStartedShard(
             true,
@@ -2786,7 +2882,7 @@ public class IndexShardTests extends IndexShardTestCase {
         DiscoveryNode localNode = new DiscoveryNode("foo", buildNewFakeTransportAddress(), emptyMap(), emptySet(), Version.CURRENT);
         target.markAsRecovering("remote_store", new RecoveryState(routing, localNode, null));
         final PlainActionFuture<Boolean> future = PlainActionFuture.newFuture();
-        target.restoreFromRemoteStore(future);
+        target.restoreFromRemoteStore(null, future);
         target.remoteStore().decRef();
 
         assertTrue(future.actionGet());

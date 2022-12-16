@@ -473,15 +473,17 @@ final class StoreRecovery {
                 storeDirectory.copyFrom(remoteDirectory, file, file, IOContext.DEFAULT);
             }
 
-            FileTransferTracker fileTransferTracker = new FileTransferTracker(shardId);
-            BlobStoreRepository blobStoreRepository = (BlobStoreRepository) repository;
-            TranslogTransferManager translogTransferManager = new TranslogTransferManager(
-                new BlobStoreTransferService(blobStoreRepository.blobStore(), indexShard.getThreadPool().executor(ThreadPool.Names.TRANSLOG_TRANSFER)),
-                blobStoreRepository.basePath().add(shardId.getIndex().getUUID()).add(String.valueOf(shardId.id())),
-                fileTransferTracker,
-                fileTransferTracker::exclusionFilter
-            );
-            RemoteFsTranslog.download(translogTransferManager, indexShard.shardPath().resolveTranslog());
+            if (repository != null) {
+                FileTransferTracker fileTransferTracker = new FileTransferTracker(shardId);
+                BlobStoreRepository blobStoreRepository = (BlobStoreRepository) repository;
+                TranslogTransferManager translogTransferManager = new TranslogTransferManager(
+                    new BlobStoreTransferService(blobStoreRepository.blobStore(), indexShard.getThreadPool().executor(ThreadPool.Names.TRANSLOG_TRANSFER)),
+                    blobStoreRepository.basePath().add(shardId.getIndex().getUUID()).add(String.valueOf(shardId.id())),
+                    fileTransferTracker,
+                    fileTransferTracker::exclusionFilter
+                );
+                RemoteFsTranslog.download(translogTransferManager, indexShard.shardPath().resolveTranslog());
+            }
 
             assert indexShard.shardRouting.primary() : "only primary shards can recover from store";
             indexShard.recoveryState().getIndex().setFileDetailsComplete();

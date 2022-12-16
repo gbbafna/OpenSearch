@@ -3083,7 +3083,7 @@ public class IndexShard extends AbstractIndexShardComponent implements IndicesCl
                 executeRecovery("from store", recoveryState, recoveryListener, this::recoverFromStore);
                 break;
             case REMOTE_STORE:
-                final String remoteRepo = indexSettings.getRemoteStoreRepository();
+                final String remoteRepo = indexSettings.getRemoteStoreTranslogRepository();
                 executeRecovery("from remote store", recoveryState, recoveryListener,
                     l -> restoreFromRemoteStore(repositoriesService.repository(remoteRepo), l));
                 break;
