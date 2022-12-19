@@ -475,6 +475,7 @@ final class StoreRecovery {
 
             if (repository != null) {
                 FileTransferTracker fileTransferTracker = new FileTransferTracker(shardId);
+                assert repository instanceof BlobStoreRepository : "repository should be instance of BlobStoreRepository";
                 BlobStoreRepository blobStoreRepository = (BlobStoreRepository) repository;
                 TranslogTransferManager translogTransferManager = new TranslogTransferManager(
                     new BlobStoreTransferService(blobStoreRepository.blobStore(), indexShard.getThreadPool().executor(ThreadPool.Names.TRANSLOG_TRANSFER)),
