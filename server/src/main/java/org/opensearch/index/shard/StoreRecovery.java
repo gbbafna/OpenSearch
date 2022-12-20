@@ -478,12 +478,15 @@ final class StoreRecovery {
                 assert repository instanceof BlobStoreRepository : "repository should be instance of BlobStoreRepository";
                 BlobStoreRepository blobStoreRepository = (BlobStoreRepository) repository;
                 TranslogTransferManager translogTransferManager = new TranslogTransferManager(
-                    new BlobStoreTransferService(blobStoreRepository.blobStore(), indexShard.getThreadPool().executor(ThreadPool.Names.TRANSLOG_TRANSFER)),
+                    new BlobStoreTransferService(
+                        blobStoreRepository.blobStore(),
+                        indexShard.getThreadPool().executor(ThreadPool.Names.TRANSLOG_TRANSFER)
+                    ),
                     blobStoreRepository.basePath().add(shardId.getIndex().getUUID()).add(String.valueOf(shardId.id())),
                     fileTransferTracker,
                     fileTransferTracker::exclusionFilter
                 );
-                RemoteFsTranslog.download(translogTransferManager, indexShard.shardPath().resolveTranslog());
+                RemoteFsTranslog.download(translogTransferManager, indexShard.shardPath().resolveTranslog(), true);
             }
 
             assert indexShard.shardRouting.primary() : "only primary shards can recover from store";

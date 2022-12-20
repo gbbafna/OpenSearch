@@ -3084,8 +3084,12 @@ public class IndexShard extends AbstractIndexShardComponent implements IndicesCl
                 break;
             case REMOTE_STORE:
                 final String remoteRepo = indexSettings.getRemoteStoreTranslogRepository();
-                executeRecovery("from remote store", recoveryState, recoveryListener,
-                    l -> restoreFromRemoteStore(repositoriesService.repository(remoteRepo), l));
+                executeRecovery(
+                    "from remote store",
+                    recoveryState,
+                    recoveryListener,
+                    l -> restoreFromRemoteStore(repositoriesService.repository(remoteRepo), l)
+                );
                 break;
             case PEER:
                 try {

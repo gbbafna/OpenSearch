@@ -2766,9 +2766,11 @@ public class IndexShardTests extends IndexShardTestCase {
 
         IndexShard target = newStartedShard(
             true,
-            Settings.builder().put(IndexMetadata.SETTING_REMOTE_STORE_ENABLED, true).
-                put(IndexMetadata.SETTING_REMOTE_TRANSLOG_STORE_ENABLED, true).
-                put(IndexMetadata.SETTING_REMOTE_TRANSLOG_STORE_REPOSITORY, "test-repo").build(),
+            Settings.builder()
+                .put(IndexMetadata.SETTING_REMOTE_STORE_ENABLED, true)
+                .put(IndexMetadata.SETTING_REMOTE_TRANSLOG_STORE_ENABLED, true)
+                .put(IndexMetadata.SETTING_REMOTE_TRANSLOG_STORE_REPOSITORY, "test-repo")
+                .build(),
             new InternalEngineFactory()
         );
 
@@ -2814,7 +2816,7 @@ public class IndexShardTests extends IndexShardTestCase {
         target.remoteStore().incRef();
         try {
             target = reinitShard(target, routing);
-        } catch(Throwable t) {
+        } catch (Throwable t) {
             target = reinitShard(target, routing);
         }
 

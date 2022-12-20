@@ -14,13 +14,12 @@ import org.apache.lucene.store.InputStreamDataInput;
 import org.apache.lucene.store.OutputStreamIndexOutput;
 import org.apache.lucene.util.SetOnce;
 import org.opensearch.common.bytes.BytesReference;
-import org.opensearch.common.io.stream.BytesStreamInput;
 import org.opensearch.common.io.stream.BytesStreamOutput;
 import org.opensearch.common.io.stream.StreamInput;
-import org.opensearch.common.lucene.store.InputStreamIndexInput;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 
@@ -45,7 +44,7 @@ public class TranslogTransferMetadata {
 
     private final SetOnce<Map<String, String>> generationToPrimaryTermMapper = new SetOnce<>();
 
-    private static final String METADATA_SEPARATOR = "__";
+    protected static final String METADATA_SEPARATOR = "__";
 
     private static final int BUFFER_SIZE = 4096;
 
@@ -140,6 +139,10 @@ public class TranslogTransferMetadata {
         out.writeLong(generation);
         out.writeLong(minTranslogGeneration);
         out.writeLong(timeStamp);
-        out.writeMapOfStrings(generationToPrimaryTermMapper.get());
+        if (generationToPrimaryTermMapper.get() != null) {
+            out.writeMapOfStrings(generationToPrimaryTermMapper.get());
+        } else {
+            out.writeMapOfStrings(new HashMap<>());
+        }
     }
 }
