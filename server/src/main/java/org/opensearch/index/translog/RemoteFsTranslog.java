@@ -105,7 +105,8 @@ public class RemoteFsTranslog extends Translog {
         Checkpoint checkpoint;
         try {
             checkpoint = readCheckpoint(location);
-            if (isRemoteTranslogAhead(checkpoint, primaryTermSupplier.getAsLong()) == false) {
+            if (isLocalTranslogLagging(checkpoint, primaryTermSupplier.getAsLong()) == false) {
+                logger.info("Local checkpoint is behind remote, downloading the diff from remote translog");
                 return checkpoint;
             }
         } catch (Exception e) {
@@ -117,7 +118,7 @@ public class RemoteFsTranslog extends Translog {
         return checkpoint;
     }
 
-    private boolean isRemoteTranslogAhead(Checkpoint checkpoint, long primaryTerm) throws IOException {
+    private boolean isLocalTranslogLagging(Checkpoint checkpoint, long primaryTerm) throws IOException {
         TranslogTransferMetadata translogMetadata = translogTransferManager.readMetadata();
         if (translogMetadata != null) {
             return translogMetadata.getGeneration() > checkpoint.getGeneration() && translogMetadata.getPrimaryTerm() >= primaryTerm;
