@@ -129,6 +129,9 @@ public class RemoteFsTranslog extends Translog {
     public static void download(TranslogTransferManager translogTransferManager, Path location, boolean override) throws IOException {
         TranslogTransferMetadata translogMetadata = translogTransferManager.readMetadata();
         if (translogMetadata != null) {
+            if(Files.notExists(location)) {
+                Files.createDirectories(location);
+            }
             if (override) {
                 // Delete translog files on local before downloading from remote
                 for (Path file : FileSystemUtils.files(location)) {
