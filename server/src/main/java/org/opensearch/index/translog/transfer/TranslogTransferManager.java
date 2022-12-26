@@ -177,11 +177,9 @@ public class TranslogTransferManager {
                 }
                 return 0;
             });
-            return new TranslogTransferMetadata(
-                new InputStreamStreamInput(
-                    transferService.readFile(remoteMetadaTransferPath, metadataFilenames.get(metadataFilenames.size() - 1))
-                )
-            );
+            try (InputStreamStreamInput streamInput = new InputStreamStreamInput(transferService.readFile(remoteMetadaTransferPath, metadataFilenames.get(metadataFilenames.size() - 1)))) {
+                return new TranslogTransferMetadata(streamInput);
+            }
         }
         return null;
     }

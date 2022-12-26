@@ -106,8 +106,9 @@ public class RemoteFsTranslog extends Translog {
         try {
             checkpoint = readCheckpoint(location);
             if (isLocalTranslogLagging(checkpoint, primaryTermSupplier.getAsLong()) == false) {
-                logger.info("Local checkpoint is behind remote, downloading the diff from remote translog");
                 return checkpoint;
+            } else {
+                logger.info("Local checkpoint is behind remote, downloading the diff from remote translog");
             }
         } catch (Exception e) {
             logger.warn("Exception while reading checkpoint, downloading from remote translog");
