@@ -232,7 +232,7 @@ public class Lucene {
             // do nothing and close this will kick off IndexFileDeleter which will remove all pending files
         }
         return si;
-    }
+    }x
 
     /**
      * Returns an index commit for the given {@link SegmentInfos} in the given directory.

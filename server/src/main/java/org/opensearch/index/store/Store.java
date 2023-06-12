@@ -826,7 +826,7 @@ public class Store extends AbstractIndexShardComponent implements Closeable, Ref
         SegmentInfos lastCommittedSegmentInfos,
         boolean deleteTempFiles
     ) throws IOException {
-        assert indexSettings.isSegRepEnabled();
+        assert indexSettings.isSegRepEnabled() || indexSettings.isRemoteStoreEnabled();
         // fetch a snapshot from the latest on disk Segments_N file. This can be behind
         // the passed in local in memory snapshot, so we want to ensure files it references are not removed.
         metadataLock.writeLock().lock();
@@ -935,7 +935,7 @@ public class Store extends AbstractIndexShardComponent implements Closeable, Ref
      * @throws IOException when there is an IO error committing.
      */
     public void commitSegmentInfos(SegmentInfos latestSegmentInfos, long maxSeqNo, long processedCheckpoint) throws IOException {
-        assert indexSettings.isSegRepEnabled();
+        assert indexSettings.isSegRepEnabled() || indexSettings.isRemoteStoreEnabled();
         metadataLock.writeLock().lock();
         try {
             final Map<String, String> userData = new HashMap<>(latestSegmentInfos.getUserData());

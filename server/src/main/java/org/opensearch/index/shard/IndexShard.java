@@ -3545,7 +3545,7 @@ public class IndexShard extends AbstractIndexShardComponent implements IndicesCl
                 new RemoteStoreRefreshListener(
                     this,
                     // Add the checkpoint publisher if the Segment Replciation via remote store is enabled.
-                    indexSettings.isSegRepWithRemoteEnabled() ? this.checkpointPublisher : SegmentReplicationCheckpointPublisher.EMPTY,
+                    SegmentReplicationCheckpointPublisher.EMPTY,
                     remoteRefreshSegmentPressureService.getRemoteRefreshSegmentTracker(shardId())
                 )
             );
@@ -3597,6 +3597,10 @@ public class IndexShard extends AbstractIndexShardComponent implements IndicesCl
 
     public boolean isRemoteTranslogEnabled() {
         return indexSettings() != null && indexSettings().isRemoteTranslogStoreEnabled();
+    }
+
+    public boolean isSegRepEnabled() {
+        return indexSettings.isSegRepEnabled();
     }
 
     /**

@@ -84,7 +84,7 @@ public class FeatureFlags {
      * and false otherwise.
      */
     public static boolean isEnabled(String featureFlagName) {
-        if ("true".equalsIgnoreCase(System.getProperty(featureFlagName))) {
+        if ("true".equalsIgnoreCase(System.getProperty(featureFlagName)) || featureFlagName.equals(REMOTE_STORE)) {
             // TODO: Remove the if condition once FeatureFlags are only supported via opensearch.yml
             return true;
         }
@@ -97,7 +97,7 @@ public class FeatureFlags {
         Property.NodeScope
     );
 
-    public static final Setting<Boolean> REMOTE_STORE_SETTING = Setting.boolSetting(REMOTE_STORE, false, Property.NodeScope);
+    public static final Setting<Boolean> REMOTE_STORE_SETTING = Setting.boolSetting(REMOTE_STORE, true, Property.NodeScope);
 
     public static final Setting<Boolean> EXTENSIONS_SETTING = Setting.boolSetting(EXTENSIONS, false, Property.NodeScope);
 
