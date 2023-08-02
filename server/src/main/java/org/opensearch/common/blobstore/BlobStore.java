@@ -53,4 +53,5 @@ public interface BlobStore extends Closeable {
     default Map<String, Long> stats() {
         return Collections.emptyMap();
     }
+
 }
