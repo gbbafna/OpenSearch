@@ -602,6 +602,13 @@ public class RepositoriesService extends AbstractLifecycleComponent implements C
     }
 
     /**
+     * Creates repository holder. This method starts the non-internal repository
+     */
+    public Repository createRepository(RepositoryMetadata repositoryMetadata) {
+        return this.createRepository(repositoryMetadata, typesRegistry);
+    }
+
+    /**
      * Creates repository holder. This method starts the repository
      */
     private Repository createRepository(RepositoryMetadata repositoryMetadata, Map<String, Repository.Factory> factories) {
@@ -624,16 +631,16 @@ public class RepositoriesService extends AbstractLifecycleComponent implements C
             throw new RepositoryException(repositoryMetadata.name(), "failed to create repository", e);
         }
     }
-
-    private static void validate(final String identifier) {
-        if (org.opensearch.core.common.Strings.hasLength(identifier) == false) {
-            throw new RepositoryException(identifier, "cannot be empty");
+    
+    public static void validate(final String repositoryName) {
+        if (Strings.hasLength(repositoryName) == false) {
+            throw new RepositoryException(repositoryName, "cannot be empty");
         }
-        if (identifier.contains("#")) {
-            throw new RepositoryException(identifier, "must not contain '#'");
+        if (repositoryName.contains("#")) {
+            throw new RepositoryException(repositoryName, "must not contain '#'");
         }
-        if (Strings.validFileName(identifier) == false) {
-            throw new RepositoryException(identifier, "must not contain the following characters " + Strings.INVALID_FILENAME_CHARS);
+        if (Strings.validFileName(repositoryName) == false) {
+            throw new RepositoryException(repositoryName, "must not contain the following characters " + Strings.INVALID_FILENAME_CHARS);
         }
     }
 
