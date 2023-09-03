@@ -529,8 +529,8 @@ public class Node implements Closeable {
             final ThreadPool threadPool = new ThreadPool(settings, runnableTaskListener, executorBuilders.toArray(new ExecutorBuilder[0]));
 
             final SetOnce<RepositoriesService> repositoriesServiceReference = new SetOnce<>();
-            final RemoteStoreNodeService remoteStoreService = new RemoteStoreNodeService(repositoriesServiceReference::get, threadPool);
-            localNodeFactory = new LocalNodeFactory(settings, nodeEnvironment.nodeId(), remoteStoreService);
+            final RemoteStoreNodeService remoteStoreNodeService = new RemoteStoreNodeService(repositoriesServiceReference::get, threadPool);
+            localNodeFactory = new LocalNodeFactory(settings, nodeEnvironment.nodeId(), remoteStoreNodeService);
             resourcesToClose.add(() -> ThreadPool.terminate(threadPool, 10, TimeUnit.SECONDS));
             final ResourceWatcherService resourceWatcherService = new ResourceWatcherService(settings, threadPool);
             resourcesToClose.add(resourceWatcherService);
@@ -1001,7 +1001,7 @@ public class Node implements Closeable {
                 rerouteService,
                 fsHealthService,
                 persistedStateRegistry,
-                remoteStoreService
+                remoteStoreNodeService
             );
             final SearchPipelineService searchPipelineService = new SearchPipelineService(
                 clusterService,
@@ -1739,12 +1739,12 @@ public class Node implements Closeable {
         private final SetOnce<DiscoveryNode> localNode = new SetOnce<>();
         private final String persistentNodeId;
         private final Settings settings;
-        private final RemoteStoreNodeService remoteStoreService;
+        private final RemoteStoreNodeService remoteStoreNodeService;
 
-        private LocalNodeFactory(Settings settings, String persistentNodeId, RemoteStoreNodeService remoteStoreService) {
+        private LocalNodeFactory(Settings settings, String persistentNodeId, RemoteStoreNodeService remoteStoreNodeService) {
             this.persistentNodeId = persistentNodeId;
             this.settings = settings;
-            this.remoteStoreService = remoteStoreService;
+            this.remoteStoreNodeService = remoteStoreNodeService;
         }
 
         @Override
@@ -1758,7 +1758,7 @@ public class Node implements Closeable {
                         settings,
                         boundTransportAddress.publishAddress(),
                         persistentNodeId,
-                        remoteStoreService
+                        remoteStoreNodeService
                     )
                 );
             } else {
