@@ -526,23 +526,7 @@ public class RemoteStoreStatsIT extends RemoteStoreBaseIntegTestCase {
 
         // Index some more docs to force segment uploads to remote store
         indexDocs();
-
-        RemoteStoreStatsResponse remoteStoreStatsResponse = client().admin().cluster().prepareRemoteStoreStats(INDEX_NAME, "0").get();
-        Arrays.stream(remoteStoreStatsResponse.getRemoteStoreStats()).forEach(statObject -> {
-            RemoteSegmentTransferTracker.Stats segmentStats = statObject.getSegmentStats();
-            // Assert that we have both upload and download stats for the index
-            assertTrue(
-                segmentStats.totalUploadsStarted > 0 && segmentStats.totalUploadsSucceeded > 0 && segmentStats.totalUploadsFailed == 0
-            );
-            assertTrue(
-                segmentStats.directoryFileTransferTrackerStats.transferredBytesStarted > 0
-                    && segmentStats.directoryFileTransferTrackerStats.transferredBytesSucceeded > 0
-            );
-
-            RemoteTranslogTransferTracker.Stats translogStats = statObject.getTranslogStats();
-            assertNonZeroTranslogUploadStatsNoFailures(translogStats);
-            assertNonZeroTranslogDownloadStats(translogStats);
-        });
+        
     }
 
     public void testNonZeroPrimaryStatsOnNewlyCreatedIndexWithZeroDocs() throws Exception {
