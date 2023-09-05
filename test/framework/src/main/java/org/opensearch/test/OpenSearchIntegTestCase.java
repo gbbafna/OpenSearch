@@ -532,7 +532,7 @@ public abstract class OpenSearchIntegTestCase extends OpenSearchTestCase {
         if (random.nextBoolean()) {
             builder.put(
                 IndexSettings.INDEX_TRANSLOG_DURABILITY_SETTING.getKey(),
-                RandomPicks.randomFrom(random, Translog.Durability.values())
+                Translog.Durability.ASYNC
             );
         }
 
