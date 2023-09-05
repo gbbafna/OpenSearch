@@ -8,6 +8,7 @@
 
 package org.opensearch.remotestore;
 
+import org.junit.Before;
 import org.opensearch.action.admin.cluster.health.ClusterHealthResponse;
 import org.opensearch.action.admin.cluster.remotestore.restore.RestoreRemoteStoreRequest;
 import org.opensearch.action.admin.cluster.remotestore.stats.RemoteStoreStats;
@@ -25,7 +26,7 @@ import org.opensearch.index.remote.RemoteSegmentTransferTracker;
 import org.opensearch.index.remote.RemoteTranslogTransferTracker;
 import org.opensearch.test.InternalTestCluster;
 import org.opensearch.test.OpenSearchIntegTestCase;
-import org.junit.Before;
+import org.opensearch.test.junit.annotations.TestIssueLogging;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -496,6 +497,7 @@ public class RemoteStoreStatsIT extends RemoteStoreBaseIntegTestCase {
         indexSingleDoc(INDEX_NAME);
     }
 
+    @TestIssueLogging(value = "_root:DEBUG,org.opensearch.index.translog:TRACE", issueUrl = "")
     public void testStatsOnRemoteStoreRestore() throws IOException {
         // Creating an index with primary shard count == total nodes in cluster and 0 replicas
         int dataNodeCount = client().admin().cluster().prepareHealth().get().getNumberOfDataNodes();

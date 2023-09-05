@@ -8,6 +8,8 @@
 
 package org.opensearch.index.translog.transfer;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.opensearch.common.collect.Tuple;
 import org.opensearch.index.translog.TranslogReader;
 
@@ -33,7 +35,6 @@ import static org.opensearch.index.translog.transfer.FileSnapshot.TranslogFileSn
  * @opensearch.internal
  */
 public class TranslogCheckpointTransferSnapshot implements TransferSnapshot, Closeable {
-
     private final Set<Tuple<TranslogFileSnapshot, CheckpointFileSnapshot>> translogCheckpointFileInfoTupleSet;
     private final int size;
     private final long generation;
@@ -164,6 +165,10 @@ public class TranslogCheckpointTransferSnapshot implements TransferSnapshot, Clo
             translogTransferSnapshot.setMinTranslogGeneration(highestGenMinTranslogGeneration);
 
             assert this.primaryTerm == highestGenPrimaryTerm : "inconsistent primary term";
+            if (this.generation != highestGeneration) {
+                Logger logger = LogManager.getLogger(getClass());
+                logger.error("Generations not equal {} {} {} {}", this.generation, highestGeneration, highestGenMinTranslogGeneration, readers.size());
+            }
             assert this.generation == highestGeneration : " inconsistent generation ";
             final long finalHighestGeneration = highestGeneration;
             assert LongStream.iterate(lowestGeneration, i -> i + 1)

@@ -243,7 +243,7 @@ public class RemoteFsTranslog extends Translog {
                     readers.add(reader);
                     copyCheckpointTo(location.resolve(getCommitCheckpointFileName(current.getGeneration())));
                     if (closed.get() == false) {
-                        logger.trace("Creating new writer for gen: [{}]", current.getGeneration() + 1);
+                        logger.debug("Creating new writer for gen: [{}]", current.getGeneration() + 1);
                         current = createWriter(current.getGeneration() + 1);
                     }
                 } catch (final Exception e) {
@@ -279,11 +279,11 @@ public class RemoteFsTranslog extends Translog {
         // primary, the engine is reset to InternalEngine which also initialises the RemoteFsTranslog which in turns
         // downloads all the translogs from remote store and does a flush before the relocation finishes.
         if (primaryModeSupplier.getAsBoolean() == false) {
-            logger.trace("skipped uploading translog for {} {}", primaryTerm, generation);
+            logger.debug("skipped uploading translog for {} {}", primaryTerm, generation);
             // NO-OP
             return true;
         }
-        logger.trace("uploading translog for {} {}", primaryTerm, generation);
+        logger.debug("uploading translog for {} {}", primaryTerm, generation);
         try (
             TranslogCheckpointTransferSnapshot transferSnapshotProvider = new TranslogCheckpointTransferSnapshot.Builder(
                 primaryTerm,

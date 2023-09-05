@@ -30,6 +30,7 @@ import org.opensearch.snapshots.SnapshotState;
 import org.opensearch.test.InternalTestCluster;
 import org.junit.After;
 import org.junit.Before;
+import org.opensearch.test.junit.annotations.TestIssueLogging;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -96,6 +97,7 @@ public class RemoteRestoreSnapshotIT extends AbstractSnapshotIntegTestCase {
         }
     }
 
+    @TestIssueLogging(value = "_root:DEBUG", issueUrl = "")
     public void testRestoreOperationsShallowCopyEnabled() throws IOException, ExecutionException, InterruptedException {
         String clusterManagerNode = internalCluster().startClusterManagerOnlyNode();
         String primary = internalCluster().startDataOnlyNode();
