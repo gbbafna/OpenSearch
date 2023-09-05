@@ -631,7 +631,7 @@ public class RepositoriesService extends AbstractLifecycleComponent implements C
             throw new RepositoryException(repositoryMetadata.name(), "failed to create repository", e);
         }
     }
-    
+
     public static void validate(final String repositoryName) {
         if (Strings.hasLength(repositoryName) == false) {
             throw new RepositoryException(repositoryName, "cannot be empty");
