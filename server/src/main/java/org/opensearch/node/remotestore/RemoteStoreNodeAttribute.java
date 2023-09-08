@@ -33,7 +33,7 @@ import java.util.stream.Collectors;
  */
 public class RemoteStoreNodeAttribute {
 
-    public static final String YOUR_PATH = "/Users/gbbafna/Desktop/snapshot/";
+    public static final String YOUR_PATH = "/home/gbbafna/snapshot/";
 
     public static final String REMOTE_STORE_NODE_ATTRIBUTE_KEY_PREFIX = "remote_store";
     public static final String REMOTE_STORE_SEGMENT_REPOSITORY_NAME_ATTRIBUTE_KEY = "remote_store.segment.repository";
