@@ -127,30 +127,30 @@ public class FsRepository extends BlobStoreRepository {
             );
             throw new RepositoryException(metadata.name(), "missing location");
         }
-        Path locationFile = environment.resolveRepoFile(location);
-        if (locationFile == null) {
-            if (environment.repoFiles().length > 0) {
-                logger.warn(
-                    "The specified location [{}] doesn't start with any " + "repository paths specified by the path.repo setting: [{}] ",
-                    location,
-                    environment.repoFiles()
-                );
-                throw new RepositoryException(
-                    metadata.name(),
-                    "location [" + location + "] doesn't match any of the locations specified by path.repo"
-                );
-            } else {
-                logger.warn(
-                    "The specified location [{}] should start with a repository path specified by"
-                        + " the path.repo setting, but the path.repo setting was not set on this node",
-                    location
-                );
-                throw new RepositoryException(
-                    metadata.name(),
-                    "location [" + location + "] doesn't match any of the locations specified by path.repo because this setting is empty"
-                );
-            }
-        }
+        //Path locationFile = environment.resolveRepoFile(location);
+//        if (locationFile == null) {
+//            if (environment.repoFiles().length > 0) {
+//                logger.warn(
+//                    "The specified location [{}] doesn't start with any " + "repository paths specified by the path.repo setting: [{}] ",
+//                    location,
+//                    environment.repoFiles()
+//                );
+//                throw new RepositoryException(
+//                    metadata.name(),
+//                    "location [" + location + "] doesn't match any of the locations specified by path.repo"
+//                );
+//            } else {
+//                logger.warn(
+//                    "The specified location [{}] should start with a repository path specified by"
+//                        + " the path.repo setting, but the path.repo setting was not set on this node",
+//                    location
+//                );
+//                throw new RepositoryException(
+//                    metadata.name(),
+//                    "location [" + location + "] doesn't match any of the locations specified by path.repo because this setting is empty"
+//                );
+//            }
+//        }
 
         if (CHUNK_SIZE_SETTING.exists(metadata.settings())) {
             this.chunkSize = CHUNK_SIZE_SETTING.get(metadata.settings());

@@ -14,7 +14,6 @@ import org.opensearch.cluster.metadata.RepositoryMetadata;
 import org.opensearch.cluster.node.DiscoveryNode;
 import org.opensearch.common.settings.Settings;
 import org.opensearch.gateway.remote.RemoteClusterStateService;
-import org.opensearch.node.Node;
 import org.opensearch.repositories.blobstore.BlobStoreRepository;
 
 import java.util.ArrayList;
@@ -33,6 +32,8 @@ import java.util.stream.Collectors;
  * @opensearch.internal
  */
 public class RemoteStoreNodeAttribute {
+
+    public static final String YOUR_PATH = "/Users/gbbafna/Desktop/snapshot/";
 
     public static final String REMOTE_STORE_NODE_ATTRIBUTE_KEY_PREFIX = "remote_store";
     public static final String REMOTE_STORE_SEGMENT_REPOSITORY_NAME_ATTRIBUTE_KEY = "remote_store.segment.repository";
@@ -113,31 +114,27 @@ public class RemoteStoreNodeAttribute {
     }
 
     private RepositoryMetadata buildRepositoryMetadata(DiscoveryNode node, String name) {
-        String type = validateAttributeNonNull(
-            node,
-            String.format(Locale.getDefault(), REMOTE_STORE_REPOSITORY_TYPE_ATTRIBUTE_KEY_FORMAT, name)
-        );
-        Map<String, String> settingsMap = validateSettingsAttributesNonNull(node, name);
 
         Settings.Builder settings = Settings.builder();
-        settingsMap.forEach(settings::put);
-
-        CryptoMetadata cryptoMetadata = buildCryptoMetadata(node, name);
+        settings.put("location", YOUR_PATH);
 
         // Repository metadata built here will always be for a system repository.
         settings.put(BlobStoreRepository.SYSTEM_REPOSITORY_SETTING.getKey(), true);
 
-        return new RepositoryMetadata(name, type, settings.build(), cryptoMetadata);
+        RepositoryMetadata md = new RepositoryMetadata("test-repo", "fs", settings.build());
+        return md;
+        //return new RepositoryMetadata(name, type, settings.build(), cryptoMetadata);
     }
 
     private RepositoriesMetadata buildRepositoriesMetadata(DiscoveryNode node) {
         List<RepositoryMetadata> repositoryMetadataList = new ArrayList<>();
         Set<String> repositoryNames = new HashSet<>();
 
-        repositoryNames.add(validateAttributeNonNull(node, REMOTE_STORE_SEGMENT_REPOSITORY_NAME_ATTRIBUTE_KEY));
-        repositoryNames.add(validateAttributeNonNull(node, REMOTE_STORE_TRANSLOG_REPOSITORY_NAME_ATTRIBUTE_KEY));
-        repositoryNames.add(validateAttributeNonNull(node, REMOTE_STORE_CLUSTER_STATE_REPOSITORY_NAME_ATTRIBUTE_KEY));
-
+//        repositoryNames.add(validateAttributeNonNull(node, REMOTE_STORE_SEGMENT_REPOSITORY_NAME_ATTRIBUTE_KEY));
+//        repositoryNames.add(validateAttributeNonNull(node, REMOTE_STORE_TRANSLOG_REPOSITORY_NAME_ATTRIBUTE_KEY));
+//        repositoryNames.add(validateAttributeNonNull(node, REMOTE_STORE_CLUSTER_STATE_REPOSITORY_NAME_ATTRIBUTE_KEY));
+//
+        repositoryNames.add("test-repo");
         for (String repositoryName : repositoryNames) {
             repositoryMetadataList.add(buildRepositoryMetadata(node, repositoryName));
         }
@@ -146,7 +143,7 @@ public class RemoteStoreNodeAttribute {
     }
 
     public static boolean isRemoteStoreAttributePresent(Settings settings) {
-        return settings.getByPrefix(Node.NODE_ATTRIBUTES.getKey() + REMOTE_STORE_NODE_ATTRIBUTE_KEY_PREFIX).isEmpty() == false;
+        return true;
     }
 
     public static boolean isRemoteStoreClusterStateEnabled(Settings settings) {

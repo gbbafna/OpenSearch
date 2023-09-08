@@ -94,8 +94,6 @@ import org.opensearch.indices.InvalidIndexNameException;
 import org.opensearch.indices.ShardLimitValidator;
 import org.opensearch.indices.SystemIndices;
 import org.opensearch.indices.replication.common.ReplicationType;
-import org.opensearch.node.Node;
-import org.opensearch.node.remotestore.RemoteStoreNodeAttribute;
 import org.opensearch.threadpool.ThreadPool;
 
 import java.io.IOException;
@@ -955,15 +953,11 @@ public class MetadataCreateIndexService {
             settingsBuilder.put(SETTING_REMOTE_STORE_ENABLED, true)
                 .put(
                     SETTING_REMOTE_SEGMENT_STORE_REPOSITORY,
-                    clusterSettings.get(
-                        Node.NODE_ATTRIBUTES.getKey() + RemoteStoreNodeAttribute.REMOTE_STORE_SEGMENT_REPOSITORY_NAME_ATTRIBUTE_KEY
-                    )
+                    "test-repo"
                 )
                 .put(
                     SETTING_REMOTE_TRANSLOG_STORE_REPOSITORY,
-                    clusterSettings.get(
-                        Node.NODE_ATTRIBUTES.getKey() + RemoteStoreNodeAttribute.REMOTE_STORE_TRANSLOG_REPOSITORY_NAME_ATTRIBUTE_KEY
-                    )
+                    "test-repo"
                 );
         }
     }
