@@ -578,4 +578,5 @@ public class RemoteStoreRefreshListenerTests extends IndexShardTestCase {
             }
         }
     }
+
 }
