@@ -340,10 +340,10 @@ public final class RemoteSegmentStoreDirectory extends FilterDirectory implement
                 RemoteStoreUtils.invertLong(generation),
                 RemoteStoreUtils.invertLong(translogGeneration),
                 RemoteStoreUtils.invertLong(uploadCounter),
+                nodeId,
                 RemoteStoreUtils.invertLong(System.currentTimeMillis()),
                 String.valueOf(metadataVersion),
-                UUIDs.base64UUID(),
-                nodeId
+                UUIDs.base64UUID()
             );
         }
 
@@ -363,7 +363,7 @@ public final class RemoteSegmentStoreDirectory extends FilterDirectory implement
                 // For versions < 2.11, we don't have node id.
                 return null;
             }
-            return new Tuple<>(new Tuple<>(RemoteStoreUtils.invertLong(tokens[1]), RemoteStoreUtils.invertLong(tokens[2])), tokens[8]);
+            return new Tuple<>(new Tuple<>(RemoteStoreUtils.invertLong(tokens[1]), RemoteStoreUtils.invertLong(tokens[2])), tokens[5]);
         }
     }
 
