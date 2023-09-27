@@ -232,10 +232,12 @@ class S3BlobContainer extends AbstractBlobContainer implements AsyncMultiStreamB
             final GetObjectAttributesResponse blobMetadata = getBlobMetadata(s3AsyncClient, bucketName, blobName).get();
 
             final long blobSize = blobMetadata.objectSize();
-            final int numberOfParts = blobMetadata.objectParts().totalPartsCount();
+            int numberOfParts = 1;
+            if (blobMetadata.objectParts() != null) {
+                numberOfParts = blobMetadata.objectParts().totalPartsCount();
+            }
             final String blobChecksum = blobMetadata.checksum().checksumCRC32();
 
-            final List<InputStreamContainer> blobPartStreams = new ArrayList<>();
             final List<CompletableFuture<InputStreamContainer>> blobPartInputStreamFutures = new ArrayList<>();
             // S3 multipart files use 1 to n indexing
             for (int partNumber = 1; partNumber <= numberOfParts; partNumber++) {
@@ -697,7 +699,7 @@ class S3BlobContainer extends AbstractBlobContainer implements AsyncMultiStreamB
     ) {
         final GetObjectRequest.Builder getObjectRequestBuilder = GetObjectRequest.builder()
             .bucket(bucketName)
-            .key(blobName)
+            .key(buildKey(blobName))
             .partNumber(partNumber);
 
         return SocketAccess.doPrivileged(
@@ -734,7 +736,7 @@ class S3BlobContainer extends AbstractBlobContainer implements AsyncMultiStreamB
         // Fetch blob metadata - part info, size, checksum
         final GetObjectAttributesRequest getObjectAttributesRequest = GetObjectAttributesRequest.builder()
             .bucket(bucketName)
-            .key(blobName)
+            .key(buildKey(blobName))
             .objectAttributes(ObjectAttributes.CHECKSUM, ObjectAttributes.OBJECT_SIZE, ObjectAttributes.OBJECT_PARTS)
             .build();
 
