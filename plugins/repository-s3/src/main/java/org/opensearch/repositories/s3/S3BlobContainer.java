@@ -236,7 +236,11 @@ class S3BlobContainer extends AbstractBlobContainer implements AsyncMultiStreamB
             if (blobMetadata.objectParts() != null) {
                 numberOfParts = blobMetadata.objectParts().totalPartsCount();
             }
-            final String blobChecksum = blobMetadata.checksum().checksumCRC32();
+            String blobChecksum = null;
+            if (blobMetadata.checksum() != null) {
+                // Checksum will not be populated for encrypted blob containers
+                blobChecksum = blobMetadata.checksum().checksumCRC32();
+            }
 
             final List<CompletableFuture<InputStreamContainer>> blobPartInputStreamFutures = new ArrayList<>();
             // S3 multipart files use 1 to n indexing
@@ -244,13 +248,14 @@ class S3BlobContainer extends AbstractBlobContainer implements AsyncMultiStreamB
                 blobPartInputStreamFutures.add(getBlobPartInputStreamContainer(s3AsyncClient, bucketName, blobName, partNumber));
             }
 
+            String finalBlobChecksum = blobChecksum;
             CompletableFuture.allOf(blobPartInputStreamFutures.toArray(CompletableFuture[]::new)).whenComplete((unused, throwable) -> {
                 if (throwable == null) {
                     listener.onResponse(
                         new ReadContext(
                             blobSize,
                             blobPartInputStreamFutures.stream().map(CompletableFuture::join).collect(Collectors.toList()),
-                            blobChecksum
+                            finalBlobChecksum
                         )
                     );
                 } else {

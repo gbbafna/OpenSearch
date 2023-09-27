@@ -32,6 +32,21 @@
 
 package org.opensearch.repositories.s3;
 
+import org.mockito.ArgumentCaptor;
+import org.mockito.ArgumentMatchers;
+import org.opensearch.action.LatchedActionListener;
+import org.opensearch.common.blobstore.BlobContainer;
+import org.opensearch.common.blobstore.BlobMetadata;
+import org.opensearch.common.blobstore.BlobPath;
+import org.opensearch.common.blobstore.BlobStoreException;
+import org.opensearch.common.blobstore.DeleteResult;
+import org.opensearch.common.blobstore.stream.read.ReadContext;
+import org.opensearch.common.collect.Tuple;
+import org.opensearch.common.io.InputStreamContainer;
+import org.opensearch.core.action.ActionListener;
+import org.opensearch.core.common.unit.ByteSizeUnit;
+import org.opensearch.repositories.s3.async.AsyncTransferManager;
+import org.opensearch.test.OpenSearchTestCase;
 import software.amazon.awssdk.core.ResponseInputStream;
 import software.amazon.awssdk.core.async.AsyncResponseTransformer;
 import software.amazon.awssdk.core.exception.SdkException;
@@ -70,20 +85,6 @@ import software.amazon.awssdk.services.s3.model.UploadPartRequest;
 import software.amazon.awssdk.services.s3.model.UploadPartResponse;
 import software.amazon.awssdk.services.s3.paginators.ListObjectsV2Iterable;
 
-import org.opensearch.action.LatchedActionListener;
-import org.opensearch.common.blobstore.BlobContainer;
-import org.opensearch.common.blobstore.BlobMetadata;
-import org.opensearch.common.blobstore.BlobPath;
-import org.opensearch.common.blobstore.BlobStoreException;
-import org.opensearch.common.blobstore.DeleteResult;
-import org.opensearch.common.blobstore.stream.read.ReadContext;
-import org.opensearch.common.collect.Tuple;
-import org.opensearch.common.io.InputStreamContainer;
-import org.opensearch.core.action.ActionListener;
-import org.opensearch.core.common.unit.ByteSizeUnit;
-import org.opensearch.repositories.s3.async.AsyncTransferManager;
-import org.opensearch.test.OpenSearchTestCase;
-
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -104,9 +105,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
-
-import org.mockito.ArgumentCaptor;
-import org.mockito.ArgumentMatchers;
 
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.instanceOf;
@@ -973,6 +971,67 @@ public class S3BlobStoreContainerTests extends OpenSearchTestCase {
         ReadContext readContext = readContextActionListener.getResponse();
         assertEquals(objectPartCount, readContext.getNumberOfParts());
         assertEquals(checksum, readContext.getBlobChecksum());
+        assertEquals(objectSize, readContext.getBlobSize());
+
+        for (int partNumber = 1; partNumber < objectPartCount; partNumber++) {
+            InputStreamContainer inputStreamContainer = readContext.getPartStreams().get(partNumber);
+            final int offset = partNumber * partSize;
+            assertEquals(partSize, inputStreamContainer.getContentLength());
+            assertEquals(offset, inputStreamContainer.getOffset());
+            assertEquals(partSize, inputStreamContainer.getInputStream().readAllBytes().length);
+        }
+    }
+
+    public void testReadBlobAsyncSingleEncrypted() throws Exception {
+        final String bucketName = randomAlphaOfLengthBetween(1, 10);
+        final String blobName = randomAlphaOfLengthBetween(1, 10);
+
+        final long objectSize = 100L;
+        final int objectPartCount = 1;
+        final int partSize = 100;
+
+        final S3AsyncClient s3AsyncClient = mock(S3AsyncClient.class);
+        final AmazonAsyncS3Reference amazonAsyncS3Reference = new AmazonAsyncS3Reference(
+            AmazonAsyncS3WithCredentials.create(s3AsyncClient, s3AsyncClient, null)
+        );
+        final AsyncTransferManager asyncTransferManager = new AsyncTransferManager(
+            10000L,
+            mock(ExecutorService.class),
+            mock(ExecutorService.class)
+        );
+        final S3BlobStore blobStore = mock(S3BlobStore.class);
+        final BlobPath blobPath = new BlobPath();
+
+        when(blobStore.bucket()).thenReturn(bucketName);
+        when(blobStore.getStatsMetricPublisher()).thenReturn(new StatsMetricPublisher());
+        when(blobStore.serverSideEncryption()).thenReturn(false);
+        when(blobStore.asyncClientReference()).thenReturn(amazonAsyncS3Reference);
+        when(blobStore.getAsyncTransferManager()).thenReturn(asyncTransferManager);
+
+        CompletableFuture<GetObjectAttributesResponse> getObjectAttributesResponseCompletableFuture = new CompletableFuture<>();
+        getObjectAttributesResponseCompletableFuture.complete(
+            GetObjectAttributesResponse.builder()
+                .objectSize(objectSize)
+                .build()
+        );
+        when(s3AsyncClient.getObjectAttributes(any(GetObjectAttributesRequest.class))).thenReturn(
+            getObjectAttributesResponseCompletableFuture
+        );
+
+        mockObjectPartResponse(s3AsyncClient, bucketName, blobName, objectPartCount, partSize, objectSize);
+
+        CountDownLatch countDownLatch = new CountDownLatch(1);
+        CountingCompletionListener<ReadContext> readContextActionListener = new CountingCompletionListener<>();
+        LatchedActionListener<ReadContext> listener = new LatchedActionListener<>(readContextActionListener, countDownLatch);
+
+        final S3BlobContainer blobContainer = new S3BlobContainer(blobPath, blobStore);
+        blobContainer.readBlobAsync(blobName, listener);
+        countDownLatch.await();
+
+        assertEquals(1, readContextActionListener.getResponseCount());
+        assertEquals(0, readContextActionListener.getFailureCount());
+        ReadContext readContext = readContextActionListener.getResponse();
+        assertEquals(objectPartCount, readContext.getNumberOfParts());
         assertEquals(objectSize, readContext.getBlobSize());
 
         for (int partNumber = 1; partNumber < objectPartCount; partNumber++) {

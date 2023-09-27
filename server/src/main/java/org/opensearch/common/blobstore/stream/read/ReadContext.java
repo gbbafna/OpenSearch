@@ -8,6 +8,7 @@
 
 package org.opensearch.common.blobstore.stream.read;
 
+import org.opensearch.common.Nullable;
 import org.opensearch.common.annotation.ExperimentalApi;
 import org.opensearch.common.io.InputStreamContainer;
 
@@ -20,6 +21,7 @@ import java.util.List;
 public class ReadContext {
     private final long blobSize;
     private final List<InputStreamContainer> partStreams;
+    @Nullable
     private final String blobChecksum;
 
     public ReadContext(long blobSize, List<InputStreamContainer> partStreams, String blobChecksum) {
