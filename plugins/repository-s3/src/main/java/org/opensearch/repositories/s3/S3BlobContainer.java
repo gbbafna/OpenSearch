@@ -321,6 +321,11 @@ class S3BlobContainer extends AbstractBlobContainer implements AsyncMultiStreamB
         if (blobNames.isEmpty()) {
             return;
         }
+        if (blobStore.getBulkDeletesSize() == 0) {
+            logger.info("Skipping  deletes as it is disabled");
+            return;
+        }
+
         final Set<String> outstanding;
         if (relative) {
             outstanding = blobNames.stream().map(this::buildKey).collect(Collectors.toSet());

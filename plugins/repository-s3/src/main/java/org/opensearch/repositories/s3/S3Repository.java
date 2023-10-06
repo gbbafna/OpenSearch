@@ -195,7 +195,7 @@ class S3Repository extends MeteredBlobStoreRepository {
      *
      * @see <a href="https://docs.aws.amazon.com/AmazonS3/latest/API/multiobjectdeleteapi.html">S3 Documentation</a>.
      */
-    static final Setting<Integer> BULK_DELETE_SIZE = Setting.intSetting("bulk_delete_size", 2, 1, 1000);
+    static final Setting<Integer> BULK_DELETE_SIZE = Setting.intSetting("bulk_delete_size", 2, 0, 1000);
 
     /**
      * Sets the S3 storage class type for the backup files. Values may be standard, reduced_redundancy,
