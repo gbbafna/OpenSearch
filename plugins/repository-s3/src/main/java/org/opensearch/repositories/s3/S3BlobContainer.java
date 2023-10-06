@@ -327,12 +327,14 @@ class S3BlobContainer extends AbstractBlobContainer implements AsyncMultiStreamB
         } else {
             outstanding = new HashSet<>(blobNames);
         }
+        logger.info("Bulk delete size is {} ", blobStore.getBulkDeletesSize());
         try (AmazonS3Reference clientReference = blobStore.clientReference()) {
             // S3 API allows 1k blobs per delete so we split up the given blobs into requests of bulk size deletes
             final List<DeleteObjectsRequest> deleteRequests = new ArrayList<>();
             final List<String> partition = new ArrayList<>();
             for (String key : outstanding) {
                 partition.add(key);
+
                 if (partition.size() == blobStore.getBulkDeletesSize()) {
                     deleteRequests.add(bulkDelete(blobStore.bucket(), partition));
                     partition.clear();
