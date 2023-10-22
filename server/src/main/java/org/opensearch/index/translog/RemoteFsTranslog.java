@@ -33,11 +33,15 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
 import java.util.function.BooleanSupplier;
 import java.util.function.LongConsumer;
 import java.util.function.LongSupplier;
@@ -52,6 +56,7 @@ import java.util.function.LongSupplier;
  */
 public class RemoteFsTranslog extends Translog {
 
+    private static final long DOWNLOAD_TIMEOUT_IN_MILLIS = 30000 ;
     private final Logger logger;
     private final BlobStoreRepository blobStoreRepository;
     private final TranslogTransferManager translogTransferManager;
@@ -101,7 +106,7 @@ public class RemoteFsTranslog extends Translog {
             remoteTranslogTransferTracker
         );
         try {
-            download(translogTransferManager, location, logger);
+            download(translogTransferManager, location, threadPool, logger);
             Checkpoint checkpoint = readCheckpoint(location);
             this.readers.addAll(recoverFromFiles(checkpoint));
             if (readers.isEmpty()) {
@@ -160,10 +165,10 @@ public class RemoteFsTranslog extends Translog {
             fileTransferTracker,
             remoteTranslogTransferTracker
         );
-        RemoteFsTranslog.download(translogTransferManager, location, logger);
+        RemoteFsTranslog.download(translogTransferManager, location, threadPool, logger);
     }
 
-    static void download(TranslogTransferManager translogTransferManager, Path location, Logger logger) throws IOException {
+    static void download(TranslogTransferManager translogTransferManager, Path location, ThreadPool threadPool, Logger logger) throws IOException {
         /*
         In Primary to Primary relocation , there can be concurrent upload and download of translog.
         While translog files are getting downloaded by new primary, it might hence be deleted by the primary
@@ -174,7 +179,7 @@ public class RemoteFsTranslog extends Translog {
         IOException ex = null;
         for (int i = 0; i <= DOWNLOAD_RETRIES; i++) {
             try {
-                downloadOnce(translogTransferManager, location, logger);
+                downloadOnce(translogTransferManager, location, threadPool, logger);
                 return;
             } catch (FileNotFoundException | NoSuchFileException e) {
                 // continue till download retries
@@ -185,7 +190,7 @@ public class RemoteFsTranslog extends Translog {
         throw ex;
     }
 
-    static private void downloadOnce(TranslogTransferManager translogTransferManager, Path location, Logger logger) throws IOException {
+    static private void downloadOnce(TranslogTransferManager translogTransferManager, Path location, ThreadPool threadPool, Logger logger) throws IOException {
         logger.debug("Downloading translog files from remote");
         RemoteTranslogTransferTracker statsTracker = translogTransferManager.getRemoteTranslogTransferTracker();
         long prevDownloadBytesSucceeded = statsTracker.getDownloadBytesSucceeded();
@@ -202,24 +207,53 @@ public class RemoteFsTranslog extends Translog {
             }
 
             Map<String, String> generationToPrimaryTermMapper = translogMetadata.getGenerationToPrimaryTermMapper();
+            int gensToDownload = (int) (translogMetadata.getGeneration() - translogMetadata.getMinTranslogGeneration() + 1);
+
+            final CountDownLatch latch = new CountDownLatch(gensToDownload);
+            List<Exception> exceptionList = new ArrayList<>(gensToDownload);
             for (long i = translogMetadata.getGeneration(); i >= translogMetadata.getMinTranslogGeneration(); i--) {
-                String generation = Long.toString(i);
-                translogTransferManager.downloadTranslog(generationToPrimaryTermMapper.get(generation), generation, location);
+                final String generation = Long.toString(i);
+                threadPool.executor(ThreadPool.Names.TRANSLOG_TRANSFER).execute(
+                    () -> {
+                        try {
+                            translogTransferManager.downloadTranslog(generationToPrimaryTermMapper.get(generation), generation, location);
+                        } catch (IOException e) {
+                            exceptionList.add(e);
+                        } finally {
+                            latch.countDown();
+                        }
+                    }
+                );
             }
-            logger.info(
-                "Downloaded translog and checkpoint files from={} to={}",
-                translogMetadata.getMinTranslogGeneration(),
-                translogMetadata.getGeneration()
-            );
 
-            statsTracker.recordDownloadStats(prevDownloadBytesSucceeded, prevDownloadTimeInMillis);
+            try {
+                if (latch.await(DOWNLOAD_TIMEOUT_IN_MILLIS, TimeUnit.MILLISECONDS) == false) {
+                    throw new InterruptedException("Timed out waiting for download to complete");
+                }
+            } catch (InterruptedException ex) {
+                exceptionList.forEach(ex::addSuppressed);
+            }
 
-            // We copy the latest generation .ckp file to translog.ckp so that flows that depend on
-            // existence of translog.ckp file work in the same way
-            Files.copy(
-                location.resolve(Translog.getCommitCheckpointFileName(translogMetadata.getGeneration())),
-                location.resolve(Translog.CHECKPOINT_FILE_NAME)
-            );
+            if (exceptionList.isEmpty()) {
+                logger.info(
+                    "Downloaded translog and checkpoint files from={} to={}",
+                    translogMetadata.getMinTranslogGeneration(),
+                    translogMetadata.getGeneration()
+                );
+
+                statsTracker.recordDownloadStats(prevDownloadBytesSucceeded, prevDownloadTimeInMillis);
+
+                // We copy the latest generation .ckp file to translog.ckp so that flows that depend on
+                // existence of translog.ckp file work in the same way
+                Files.copy(
+                    location.resolve(Translog.getCommitCheckpointFileName(translogMetadata.getGeneration())),
+                    location.resolve(Translog.CHECKPOINT_FILE_NAME)
+                );
+            } else {
+                IOException ex = new IOException("Failed to download " + exceptionList.size() + " files during transfer");
+                exceptionList.forEach(ex::addSuppressed);
+                throw ex;
+            }
         }
         logger.debug("downloadOnce execution completed");
     }
