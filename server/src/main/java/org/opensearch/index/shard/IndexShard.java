@@ -347,6 +347,11 @@ public class IndexShard extends AbstractIndexShardComponent implements IndicesCl
     private final RemoteStoreFileDownloader fileDownloader;
     private final RecoverySettings recoverySettings;
 
+    // Set it to true only for docrep - remote migration
+    // For remote - remote , let it behave completely like remote .
+    // and
+    private boolean migratingToRemote;
+
     public IndexShard(
         final ShardRouting shardRouting,
         final IndexSettings indexSettings,
@@ -390,11 +395,12 @@ public class IndexShard extends AbstractIndexShardComponent implements IndicesCl
         this.indexSortSupplier = indexSortSupplier;
         this.indexEventListener = indexEventListener;
         this.threadPool = threadPool;
+        this.migratingToRemote = indexSettings.isRemoteTranslogStoreEnabled() == false && remoteStore != null;
         this.translogSyncProcessor = createTranslogSyncProcessor(
             logger,
             threadPool,
             this::getEngine,
-            indexSettings.isRemoteTranslogStoreEnabled(),
+            indexSettings.isRemoteTranslogStoreEnabled() || this.migratingToRemote,
             () -> getRemoteTranslogUploadBufferInterval(clusterRemoteTranslogBufferIntervalSupplier)
         );
         this.mapperService = mapperService;
@@ -480,6 +486,11 @@ public class IndexShard extends AbstractIndexShardComponent implements IndicesCl
 
     public Store store() {
         return this.store;
+    }
+
+    public boolean isMigratingToRemote() {
+        // ToDo - set it true only if relocating from docrep to segrep
+        return migratingToRemote;
     }
 
     public Store remoteStore() {
@@ -2016,7 +2027,7 @@ public class IndexShard extends AbstractIndexShardComponent implements IndicesCl
     ToDo : Fix this https://github.com/opensearch-project/OpenSearch/issues/8003
      */
     public RemoteSegmentStoreDirectory getRemoteDirectory() {
-        assert indexSettings.isRemoteStoreEnabled();
+        //assert indexSettings.isRemoteStoreEnabled();
         assert remoteStore.directory() instanceof FilterDirectory : "Store.directory is not an instance of FilterDirectory";
         FilterDirectory remoteStoreDirectory = (FilterDirectory) remoteStore.directory();
         FilterDirectory byteSizeCachingStoreDirectory = (FilterDirectory) remoteStoreDirectory.getDelegate();
@@ -2028,8 +2039,8 @@ public class IndexShard extends AbstractIndexShardComponent implements IndicesCl
      * Returns true iff it is able to verify that remote segment store
      * is in sync with local
      */
-    boolean isRemoteSegmentStoreInSync() {
-        assert indexSettings.isRemoteStoreEnabled();
+    public boolean isRemoteSegmentStoreInSync() {
+        //assert indexSettings.isRemoteStoreEnabled();
         try {
             RemoteSegmentStoreDirectory directory = getRemoteDirectory();
             if (directory.readLatestMetadataFile() != null) {

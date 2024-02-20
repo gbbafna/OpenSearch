@@ -35,12 +35,15 @@ package org.opensearch.indices.recovery;
 import org.apache.lucene.index.CorruptIndexException;
 import org.apache.lucene.index.IndexFormatTooNewException;
 import org.apache.lucene.index.IndexFormatTooOldException;
+import org.apache.lucene.store.AlreadyClosedException;
 import org.opensearch.ExceptionsHelper;
+import org.opensearch.OpenSearchException;
 import org.opensearch.action.admin.indices.flush.FlushRequest;
 import org.opensearch.cluster.node.DiscoveryNode;
 import org.opensearch.common.UUIDs;
 import org.opensearch.common.annotation.PublicApi;
 import org.opensearch.common.lucene.Lucene;
+import org.opensearch.common.unit.TimeValue;
 import org.opensearch.common.util.CancellableThreads;
 import org.opensearch.core.Assertions;
 import org.opensearch.core.action.ActionListener;
@@ -209,8 +212,35 @@ public class RecoveryTarget extends ReplicationTarget implements RecoveryTargetH
             state().getIndex().setFileDetailsComplete(); // ops-based recoveries don't send the file details
             state().getTranslog().totalOperations(totalTranslogOps);
             indexShard().openEngineAndSkipTranslogRecovery();
+            // upload to remote store in migration for primary shard
+            if (indexShard.isMigratingToRemote() && indexShard.routingEntry().primary()) {
+                logger.info("Time to upload all data to remote");
+                indexShard.refresh("Migration");
+                waitForRemoteStoreSync(indexShard);
+                logger.info("Done uploade");
+            }
             return null;
         });
+    }
+
+    private void waitForRemoteStoreSync(IndexShard indexShard) {
+        long startNanos = System.nanoTime();
+        while (System.nanoTime() - startNanos < indexShard.getRecoverySettings().internalRemoteUploadTimeout().nanos()) {
+            try {
+                if (indexShard.isRemoteSegmentStoreInSync()) {
+                    break;
+                } else {
+                    try {
+                        Thread.sleep(TimeValue.timeValueMinutes(1).seconds());
+                    } catch (InterruptedException ie) {
+                        throw new OpenSearchException("Interrupted waiting for completion of [{}]", ie);
+                    }
+                }
+            } catch (AlreadyClosedException e) {
+                // There is no point in waiting as shard is now closed .
+                return;
+            }
+        }
     }
 
     @Override

@@ -1059,7 +1059,9 @@ public class ReplicationTracker extends AbstractIndexShardComponent implements L
         this.fileBasedRecoveryThreshold = IndexSettings.FILE_BASED_RECOVERY_THRESHOLD_SETTING.get(indexSettings.getSettings());
         this.safeCommitInfoSupplier = safeCommitInfoSupplier;
         this.onReplicationGroupUpdated = onReplicationGroupUpdated;
-        this.latestReplicationCheckpoint = indexSettings.isSegRepEnabled() ? ReplicationCheckpoint.empty(shardId) : null;
+        //ToDo - Fix me
+        //this.latestReplicationCheckpoint = indexSettings.isSegRepEnabled()  ? ReplicationCheckpoint.empty(shardId) : null;
+        this.latestReplicationCheckpoint = ReplicationCheckpoint.empty(shardId);
         assert Version.V_EMPTY.equals(indexSettings.getIndexVersionCreated()) == false;
         assert invariant();
     }
@@ -1269,7 +1271,7 @@ public class ReplicationTracker extends AbstractIndexShardComponent implements L
      * @param checkpoint {@link ReplicationCheckpoint}
      */
     public synchronized void startReplicationLagTimers(ReplicationCheckpoint checkpoint) {
-        assert indexSettings.isSegRepEnabled();
+        //assert indexSettings.isSegRepEnabled();
         if (checkpoint.equals(latestReplicationCheckpoint) == false) {
             this.latestReplicationCheckpoint = checkpoint;
         }

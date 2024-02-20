@@ -984,7 +984,7 @@ public class MetadataCreateIndexService {
      * @param settingsBuilder index settings builder to be updated with relevant settings
      * @param clusterSettings cluster level settings
      */
-    private static void updateRemoteStoreSettings(Settings.Builder settingsBuilder, Settings clusterSettings) {
+    public static void updateRemoteStoreSettings(Settings.Builder settingsBuilder, Settings clusterSettings) {
         if (isRemoteStoreAttributePresent(clusterSettings)) {
             settingsBuilder.put(SETTING_REMOTE_STORE_ENABLED, true)
                 .put(

@@ -1018,7 +1018,9 @@ public class IndicesService extends AbstractLifecycleComponent
             globalCheckpointSyncer,
             retentionLeaseSyncer,
             checkpointPublisher,
-            remoteStoreStatsTrackerFactory
+            remoteStoreStatsTrackerFactory,
+            repositoriesService,
+            targetNode
         );
         indexShard.addShardFailureCallback(onShardFailure);
         indexShard.startRecovery(recoveryState, recoveryTargetService, recoveryListener, repositoriesService, mapping -> {

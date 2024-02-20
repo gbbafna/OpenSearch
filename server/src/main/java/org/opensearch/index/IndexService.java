@@ -90,6 +90,8 @@ import org.opensearch.index.shard.ShardNotFoundException;
 import org.opensearch.index.shard.ShardNotInPrimaryModeException;
 import org.opensearch.index.shard.ShardPath;
 import org.opensearch.index.similarity.SimilarityService;
+import org.opensearch.index.store.RemoteSegmentStoreDirectory;
+import org.opensearch.index.store.RemoteSegmentStoreDirectoryFactory;
 import org.opensearch.index.store.Store;
 import org.opensearch.index.translog.Translog;
 import org.opensearch.index.translog.TranslogFactory;
@@ -100,6 +102,7 @@ import org.opensearch.indices.recovery.RecoverySettings;
 import org.opensearch.indices.recovery.RecoveryState;
 import org.opensearch.indices.replication.checkpoint.SegmentReplicationCheckpointPublisher;
 import org.opensearch.plugins.IndexStorePlugin;
+import org.opensearch.repositories.RepositoriesService;
 import org.opensearch.script.ScriptService;
 import org.opensearch.search.aggregations.support.ValuesSourceRegistry;
 import org.opensearch.threadpool.ThreadPool;
@@ -126,6 +129,8 @@ import java.util.function.Supplier;
 
 import static java.util.Collections.emptyMap;
 import static java.util.Collections.unmodifiableMap;
+import static org.opensearch.cluster.metadata.IndexMetadata.SETTING_REMOTE_SEGMENT_STORE_REPOSITORY;
+import static org.opensearch.cluster.metadata.MetadataCreateIndexService.updateRemoteStoreSettings;
 import static org.opensearch.common.collect.MapBuilder.newMapBuilder;
 
 /**
@@ -455,7 +460,9 @@ public class IndexService extends AbstractIndexComponent implements IndicesClust
         final Consumer<ShardId> globalCheckpointSyncer,
         final RetentionLeaseSyncer retentionLeaseSyncer,
         final SegmentReplicationCheckpointPublisher checkpointPublisher,
-        final RemoteStoreStatsTrackerFactory remoteStoreStatsTrackerFactory
+        final RemoteStoreStatsTrackerFactory remoteStoreStatsTrackerFactory,
+        final RepositoriesService repositoriesService,
+        final DiscoveryNode targetNode
     ) throws IOException {
         Objects.requireNonNull(retentionLeaseSyncer);
         /*
@@ -484,10 +491,27 @@ public class IndexService extends AbstractIndexComponent implements IndicesClust
                     warmer.warm(reader, shard, IndexService.this.indexSettings);
                 }
             };
+            boolean remoteMigrating = false;
 
+            DiscoveryNode node = targetNode;
             Store remoteStore = null;
             if (this.indexSettings.isRemoteStoreEnabled()) {
                 Directory remoteDirectory = remoteDirectoryFactory.newDirectory(this.indexSettings, path);
+                remoteStore = new Store(shardId, this.indexSettings, remoteDirectory, lock, Store.OnClose.EMPTY, path);
+            } else if (node.isRemoteStoreNode()) {
+                logger.info("Hitting the migration case");
+                remoteMigrating = true;
+                final Settings.Builder indexSettingsBuilder = Settings.builder();
+                updateRemoteStoreSettings(indexSettingsBuilder, this.indexSettings.getNodeSettings());
+                RemoteSegmentStoreDirectoryFactory directoryFactory = new RemoteSegmentStoreDirectoryFactory(
+                    () -> repositoriesService,
+                    threadPool
+                );
+                RemoteSegmentStoreDirectory remoteDirectory = (RemoteSegmentStoreDirectory) directoryFactory.newDirectory(
+                    indexSettingsBuilder.get(SETTING_REMOTE_SEGMENT_STORE_REPOSITORY),
+                    this.indexSettings.getUUID(),
+                    shardId
+                );
                 remoteStore = new Store(shardId, this.indexSettings, remoteDirectory, lock, Store.OnClose.EMPTY, path);
             }
 
@@ -523,7 +547,7 @@ public class IndexService extends AbstractIndexComponent implements IndicesClust
                 retentionLeaseSyncer,
                 circuitBreakerService,
                 translogFactorySupplier,
-                this.indexSettings.isSegRepEnabled() ? checkpointPublisher : null,
+                this.indexSettings.isSegRepEnabled() || remoteMigrating ? checkpointPublisher : null,
                 remoteStore,
                 remoteStoreStatsTrackerFactory,
                 clusterRemoteTranslogBufferIntervalSupplier,

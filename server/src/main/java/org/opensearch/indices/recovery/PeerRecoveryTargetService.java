@@ -400,6 +400,7 @@ public class PeerRecoveryTargetService implements IndexEventListener {
                     return;
                 }
 
+
                 recoveryTarget.prepareForTranslogOperations(request.totalTranslogOps(), listener);
             }
         }
