@@ -3880,7 +3880,8 @@ public class IndexShard extends AbstractIndexShardComponent implements IndicesCl
          */
         boolean isReadOnlyReplica = indexSettings.isSegRepEnabled()
             && (shardRouting.primary() == false
-                || (shardRouting.isRelocationTarget() && recoveryState.getStage() != RecoveryState.Stage.FINALIZE));
+                || (shardRouting.isRelocationTarget() && recoveryState.getStage() != RecoveryState.Stage.FINALIZE))
+            && !(migratingToRemote == true && shardRouting.primary());
 
         return this.engineConfigFactory.newEngineConfig(
             shardId,
@@ -3927,7 +3928,8 @@ public class IndexShard extends AbstractIndexShardComponent implements IndicesCl
      * translog uploads.
      */
     public boolean isStartedPrimary() {
-        return getReplicationTracker().isPrimaryMode() && state() == IndexShardState.STARTED;
+        return (getReplicationTracker().isPrimaryMode() && state() == IndexShardState.STARTED)
+            || (migratingToRemote);
     }
 
     /**
