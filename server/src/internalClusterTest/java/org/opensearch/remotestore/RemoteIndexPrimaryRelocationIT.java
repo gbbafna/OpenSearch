@@ -45,8 +45,8 @@ public class RemoteIndexPrimaryRelocationIT extends IndexPrimaryRelocationIT {
             .build();
     }
 
-    @TestLogging(reason = "Getting trace logs from replication package", value = "org.opensearch.indices.recovery:TRACE," +
-        "org.opensearch.index.translog:TRACE")
+    @TestLogging(reason = "Getting trace logs from replication package", value = "org.opensearch.indices.recovery:TRACE,"
+        + "org.opensearch.index.translog:TRACE")
     public void testPrimaryRelocationWhileIndexing() throws Exception {
         internalCluster().startClusterManagerOnlyNode();
         super.testPrimaryRelocationWhileIndexing();

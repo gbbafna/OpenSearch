@@ -163,7 +163,8 @@ public class IndicesLifecycleListenerSingleNodeTests extends OpenSearchSingleNod
                 SegmentReplicationCheckpointPublisher.EMPTY,
                 null,
                 null,
-                localNode
+                localNode,
+                null
             );
             IndexShardTestCase.updateRoutingEntry(shard, newRouting);
             assertEquals(5, counter.get());

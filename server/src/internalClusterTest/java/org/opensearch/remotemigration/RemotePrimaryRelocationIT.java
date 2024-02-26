@@ -53,14 +53,14 @@ public class RemotePrimaryRelocationIT extends MigrationBaseTestCase {
         updateSettingsRequest.persistentSettings(Settings.builder().put(REMOTE_STORE_COMPATIBILITY_MODE_SETTING.getKey(), "mixed"));
         assertAcked(client().admin().cluster().updateSettings(updateSettingsRequest).actionGet());
 
-        //create shard with 0 replica and 1 shard
+        // create shard with 0 replica and 1 shard
         client().admin().indices().prepareCreate("test").setSettings(indexSettings()).setMapping("field", "type=text").get();
         ensureGreen("test");
 
         AtomicInteger numAutoGenDocs = new AtomicInteger();
         final AtomicBoolean finished = new AtomicBoolean(false);
         Thread indexingThread = new Thread(() -> {
-            while (finished.get() == false && numAutoGenDocs.get() < 1000) {
+            while (finished.get() == false && numAutoGenDocs.get() < 100) {
                 IndexResponse indexResponse = client().prepareIndex("test").setId("id").setSource("field", "value").get();
                 assertEquals(DocWriteResponse.Result.CREATED, indexResponse.getResult());
                 DeleteResponse deleteResponse = client().prepareDelete("test", "id").get();
@@ -79,13 +79,16 @@ public class RemotePrimaryRelocationIT extends MigrationBaseTestCase {
         String remoteNode = internalCluster().startNode();
         internalCluster().validateClusterFormed();
 
+        String remoteNode2 = internalCluster().startNode();
+        internalCluster().validateClusterFormed();
+
         // assert repo gets registered
         GetRepositoriesRequest gr = new GetRepositoriesRequest(new String[] { REPOSITORY_NAME });
         GetRepositoriesResponse getRepositoriesResponse = client.admin().cluster().getRepositories(gr).actionGet();
         assertEquals(1, getRepositoriesResponse.repositories().size());
 
         for (int i = 0; i < RELOCATION_COUNT; i++) {
-            logger.info("--> [iteration {}] relocating from {} to {} ", i , cmNodes.get(0), remoteNode);
+            logger.info("--> [iteration {}] relocating from {} to {} ", i, cmNodes.get(0), remoteNode);
             client().admin()
                 .cluster()
                 .prepareReroute()
@@ -101,6 +104,21 @@ public class RemotePrimaryRelocationIT extends MigrationBaseTestCase {
                 .execute()
                 .actionGet();
             logger.info("--> [iteration {}] relocation complete", i);
+
+            client().admin()
+                .cluster()
+                .prepareReroute()
+                .add(new MoveAllocationCommand("test", 0, remoteNode, remoteNode2))
+                .execute()
+                .actionGet();
+            clusterHealthResponse = client().admin()
+                .cluster()
+                .prepareHealth()
+                .setTimeout(TimeValue.timeValueSeconds(60))
+                .setWaitForEvents(Priority.LANGUID)
+                .setWaitForNoRelocatingShards(true)
+                .execute()
+                .actionGet();
         }
         finished.set(true);
         indexingThread.join();

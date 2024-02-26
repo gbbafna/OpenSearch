@@ -85,6 +85,7 @@ import org.opensearch.index.shard.IndexEventListener;
 import org.opensearch.index.shard.IndexShard;
 import org.opensearch.index.shard.IndexShardClosedException;
 import org.opensearch.index.shard.IndexingOperationListener;
+import org.opensearch.index.shard.RemoteMigrationShardState;
 import org.opensearch.index.shard.SearchOperationListener;
 import org.opensearch.index.shard.ShardNotFoundException;
 import org.opensearch.index.shard.ShardNotInPrimaryModeException;
@@ -462,7 +463,8 @@ public class IndexService extends AbstractIndexComponent implements IndicesClust
         final SegmentReplicationCheckpointPublisher checkpointPublisher,
         final RemoteStoreStatsTrackerFactory remoteStoreStatsTrackerFactory,
         final RepositoriesService repositoriesService,
-        final DiscoveryNode targetNode
+        final DiscoveryNode targetNode,
+        @Nullable DiscoveryNode sourceNode
     ) throws IOException {
         Objects.requireNonNull(retentionLeaseSyncer);
         /*
@@ -491,7 +493,7 @@ public class IndexService extends AbstractIndexComponent implements IndicesClust
                     warmer.warm(reader, shard, IndexService.this.indexSettings);
                 }
             };
-            boolean remoteMigrating = false;
+            RemoteMigrationShardState remoteMigrationShardState = null;
 
             DiscoveryNode node = targetNode;
             Store remoteStore = null;
@@ -500,7 +502,13 @@ public class IndexService extends AbstractIndexComponent implements IndicesClust
                 remoteStore = new Store(shardId, this.indexSettings, remoteDirectory, lock, Store.OnClose.EMPTY, path);
             } else if (node.isRemoteStoreNode()) {
                 logger.info("Hitting the migration case");
-                remoteMigrating = true;
+                boolean uploadData = false;
+                if (sourceNode != null && sourceNode.isRemoteStoreNode() == false) {
+                    assert routing.primary();
+                    logger.info("Hitting the migration case where we need to seed remote store");
+                    uploadData = true;
+                }
+                remoteMigrationShardState = new RemoteMigrationShardState(uploadData, true);
                 final Settings.Builder indexSettingsBuilder = Settings.builder();
                 updateRemoteStoreSettings(indexSettingsBuilder, this.indexSettings.getNodeSettings());
                 RemoteSegmentStoreDirectoryFactory directoryFactory = new RemoteSegmentStoreDirectoryFactory(
@@ -547,12 +555,13 @@ public class IndexService extends AbstractIndexComponent implements IndicesClust
                 retentionLeaseSyncer,
                 circuitBreakerService,
                 translogFactorySupplier,
-                this.indexSettings.isSegRepEnabled() || remoteMigrating ? checkpointPublisher : null,
+                this.indexSettings.isSegRepEnabled() || remoteMigrationShardState != null ? checkpointPublisher : null,
                 remoteStore,
                 remoteStoreStatsTrackerFactory,
                 clusterRemoteTranslogBufferIntervalSupplier,
                 nodeEnv.nodeId(),
-                recoverySettings
+                recoverySettings,
+                remoteMigrationShardState
             );
             eventListener.indexShardStateChanged(indexShard, null, indexShard.state(), "shard created");
             eventListener.afterIndexShardCreated(indexShard);

@@ -71,6 +71,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 
+import static java.lang.Thread.sleep;
 import static org.opensearch.index.translog.Translog.TRANSLOG_UUID_KEY;
 
 /**
@@ -213,11 +214,13 @@ public class RecoveryTarget extends ReplicationTarget implements RecoveryTargetH
             state().getTranslog().totalOperations(totalTranslogOps);
             indexShard().openEngineAndSkipTranslogRecovery();
             // upload to remote store in migration for primary shard
-            if (indexShard.isMigratingToRemote() && indexShard.routingEntry().primary()) {
-                logger.info("Time to upload all data to remote");
+            if (indexShard.shouldUploadToRemote() && indexShard.routingEntry().primary()) {
+                logger.info("Time to upload all data to remote and also sleep 10 sec");
                 indexShard.refresh("Migration");
                 waitForRemoteStoreSync(indexShard);
                 logger.info("Done uploade");
+            } else if (indexShard.isMigratingToRemote() && indexShard.shouldDownloadFromRemote()) {
+                logger.info("Not uploading here, but downloading");
             }
             return null;
         });
@@ -231,7 +234,7 @@ public class RecoveryTarget extends ReplicationTarget implements RecoveryTargetH
                     break;
                 } else {
                     try {
-                        Thread.sleep(TimeValue.timeValueMinutes(1).seconds());
+                        sleep(TimeValue.timeValueMinutes(1).seconds());
                     } catch (InterruptedException ie) {
                         throw new OpenSearchException("Interrupted waiting for completion of [{}]", ie);
                     }
