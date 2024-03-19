@@ -9,15 +9,16 @@
 package org.opensearch.remotemigration;
 
 import com.carrotsearch.randomizedtesting.generators.RandomNumbers;
-
 import org.opensearch.action.DocWriteResponse;
 import org.opensearch.action.admin.cluster.health.ClusterHealthResponse;
 import org.opensearch.action.admin.cluster.repositories.get.GetRepositoriesRequest;
 import org.opensearch.action.admin.cluster.repositories.get.GetRepositoriesResponse;
 import org.opensearch.action.admin.cluster.settings.ClusterUpdateSettingsRequest;
+import org.opensearch.action.admin.indices.settings.put.UpdateSettingsRequest;
 import org.opensearch.action.delete.DeleteResponse;
 import org.opensearch.action.index.IndexResponse;
 import org.opensearch.client.Client;
+import org.opensearch.cluster.metadata.IndexMetadata;
 import org.opensearch.cluster.routing.allocation.command.MoveAllocationCommand;
 import org.opensearch.common.Priority;
 import org.opensearch.common.settings.Settings;
@@ -26,6 +27,7 @@ import org.opensearch.index.query.QueryBuilders;
 import org.opensearch.plugins.Plugin;
 import org.opensearch.test.OpenSearchIntegTestCase;
 import org.opensearch.test.hamcrest.OpenSearchAssertions;
+import org.opensearch.test.junit.annotations.TestLogging;
 import org.opensearch.test.transport.MockTransportService;
 
 import java.util.Collection;
@@ -34,6 +36,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static java.util.Arrays.asList;
+import static org.opensearch.node.remotestore.RemoteStoreNodeService.MIGRATION_DIRECTION_SETTING;
 import static org.opensearch.node.remotestore.RemoteStoreNodeService.REMOTE_STORE_COMPATIBILITY_MODE_SETTING;
 import static org.opensearch.test.hamcrest.OpenSearchAssertions.assertAcked;
 
@@ -52,12 +55,17 @@ public class RemotePrimaryRelocationIT extends MigrationBaseTestCase {
         return asList(MockTransportService.TestPlugin.class);
     }
 
+    @TestLogging(reason = "Getting trace logs from replication package", value = "org.opensearch.index.translog.RemoteFsTranslog:TRACE,org.opensearch.index.shard.RemoteStoreRefreshListener:TRACE,"
+        + "org.opensearch.indices.recovery:TRACE,"
+        + "org.opensearch.index.shard.IndexShard:TRACE")
     public void testMixedModeRelocation() throws Exception {
         internalCluster().setBootstrapClusterManagerNodeIndex(0);
         List<String> cmNodes = internalCluster().startNodes(1);
         Client client = internalCluster().client(cmNodes.get(0));
         ClusterUpdateSettingsRequest updateSettingsRequest = new ClusterUpdateSettingsRequest();
-        updateSettingsRequest.persistentSettings(Settings.builder().put(REMOTE_STORE_COMPATIBILITY_MODE_SETTING.getKey(), "mixed"));
+        updateSettingsRequest.persistentSettings(Settings.builder()
+            .put(REMOTE_STORE_COMPATIBILITY_MODE_SETTING.getKey(), "mixed")
+        );
         assertAcked(client().admin().cluster().updateSettings(updateSettingsRequest).actionGet());
 
         // create shard with 0 replica and 1 shard
@@ -85,6 +93,11 @@ public class RemotePrimaryRelocationIT extends MigrationBaseTestCase {
         addRemote = true;
         String remoteNode = internalCluster().startNode();
         internalCluster().validateClusterFormed();
+
+        updateSettingsRequest.persistentSettings(Settings.builder()
+            .put(MIGRATION_DIRECTION_SETTING.getKey(), "remote_store")
+        );
+        assertAcked(client().admin().cluster().updateSettings(updateSettingsRequest).actionGet());
 
         String remoteNode2 = internalCluster().startNode();
         internalCluster().validateClusterFormed();
@@ -133,6 +146,49 @@ public class RemotePrimaryRelocationIT extends MigrationBaseTestCase {
         assertEquals(0, clusterHealthResponse.getRelocatingShards());
         logger.info("-->  relocation from remote to remote  complete");
 
+        logger.info("--> getting up the replica now to doc rep node ");
+        //Increase replica count to 1 - s
+        client().admin()
+            .indices()
+            .updateSettings(
+                new UpdateSettingsRequest("test").settings(
+                    Settings.builder()
+                        .put(IndexMetadata.SETTING_NUMBER_OF_REPLICAS, 1)
+                        .put("index.routing.allocation.exclude._name", remoteNode)
+                        .build())
+            )
+            .get();
+         client().admin()
+            .cluster()
+            .prepareHealth()
+            .setTimeout(TimeValue.timeValueSeconds(60))
+            .setWaitForEvents(Priority.LANGUID)
+            .setWaitForGreenStatus()
+            .execute()
+            .actionGet();
+        logger.info("-->  replica  is up now on docrep now, moving it to remote node");
+
+        client().admin()
+            .indices()
+            .updateSettings(
+                new UpdateSettingsRequest("test").settings(
+                    Settings.builder()
+                        .put(IndexMetadata.SETTING_NUMBER_OF_REPLICAS, 1)
+                        .put("index.routing.allocation.exclude._name", cmNodes.get(0))
+                        .build())
+            )
+            .get();
+        clusterHealthResponse = client().admin()
+            .cluster()
+            .prepareHealth()
+            .setTimeout(TimeValue.timeValueSeconds(60))
+            .setWaitForEvents(Priority.LANGUID)
+            .setWaitForNoRelocatingShards(true)
+            .execute()
+            .actionGet();
+        assertEquals(0, clusterHealthResponse.getRelocatingShards());
+
+
         finished.set(true);
         indexingThread.join();
         refresh("test");
@@ -147,6 +203,9 @@ public class RemotePrimaryRelocationIT extends MigrationBaseTestCase {
 
     }
 
+    @TestLogging(reason = "Getting trace logs from replication package", value = "org.opensearch.index.translog.RemoteFsTranslog:TRACE,org.opensearch.index.shard.RemoteStoreRefreshListener:TRACE,"
+        + "org.opensearch.indices.recovery:TRACE,"
+        + "org.opensearch.index.shard.IndexShard:TRACE")
     public void testMixedModeRelocation_RemoteSeedingFail() throws Exception {
         internalCluster().setBootstrapClusterManagerNodeIndex(0);
         List<String> cmNodes = internalCluster().startNodes(1);
