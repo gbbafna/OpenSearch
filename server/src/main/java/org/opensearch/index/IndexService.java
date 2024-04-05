@@ -506,6 +506,11 @@ public class IndexService extends AbstractIndexComponent implements IndicesClust
                         }
                         logger.info("DocRep shard {} is migrating to remote", shardId);
                         seedRemote = true;
+                    } else if (sourceNode == null && routing.primary()) {
+                        // seeding when index metadata says so
+                        // ToDo Check for this shard is seeded or not from index metadata
+                        logger.info("DocRep shard {} is migrating to remote during restart ", shardId);
+                        seedRemote = true;
                     }
                     remoteDirectory = ((RemoteSegmentStoreDirectoryFactory) remoteDirectoryFactory).newDirectory(
                         RemoteStoreNodeAttribute.getRemoteStoreSegmentRepo(this.indexSettings.getNodeSettings()),
