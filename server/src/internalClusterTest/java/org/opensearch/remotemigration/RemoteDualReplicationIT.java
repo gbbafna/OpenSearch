@@ -23,18 +23,11 @@ import org.opensearch.index.remote.RemoteSegmentStats;
 import org.opensearch.index.seqno.RetentionLease;
 import org.opensearch.index.seqno.RetentionLeases;
 import org.opensearch.indices.IndexingMemoryController;
-import org.opensearch.plugins.Plugin;
-import org.opensearch.remotestore.multipart.mocks.MockFsRepositoryPlugin;
-import org.opensearch.test.InternalSettingsPlugin;
 import org.opensearch.test.InternalTestCluster;
 import org.opensearch.test.OpenSearchIntegTestCase;
-import org.opensearch.test.transport.MockTransportService;
 
-import java.util.Collection;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import static org.opensearch.test.hamcrest.OpenSearchAssertions.assertAcked;
 
@@ -44,18 +37,6 @@ public class RemoteDualReplicationIT extends MigrationBaseTestCase {
     private final String REMOTE_PRI_DOCREP_REMOTE_REP = "remote-primary-docrep-remote-replica";
     private final String FAILOVER_REMOTE_TO_DOCREP = "failover-remote-to-docrep";
     private final String FAILOVER_REMOTE_TO_REMOTE = "failover-remote-to-remote";
-
-    @Override
-    protected Collection<Class<? extends Plugin>> nodePlugins() {
-        /* Adding the following mock plugins:
-        - InternalSettingsPlugin : To override default intervals of retention lease and global ckp sync
-        - MockFsRepositoryPlugin and MockTransportService.TestPlugin: To ensure remote interactions are not no-op and retention leases are properly propagated
-         */
-        return Stream.concat(
-            super.nodePlugins().stream(),
-            Stream.of(InternalSettingsPlugin.class, MockFsRepositoryPlugin.class, MockTransportService.TestPlugin.class)
-        ).collect(Collectors.toList());
-    }
 
     /*
     Scenario:

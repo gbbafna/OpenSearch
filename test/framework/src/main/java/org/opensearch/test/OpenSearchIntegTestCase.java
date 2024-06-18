@@ -152,7 +152,6 @@ import org.opensearch.node.NodeMocksPlugin;
 import org.opensearch.node.remotestore.RemoteStoreNodeService;
 import org.opensearch.plugins.NetworkPlugin;
 import org.opensearch.plugins.Plugin;
-import org.opensearch.repositories.fs.ReloadableFsRepository;
 import org.opensearch.script.MockScriptService;
 import org.opensearch.search.MockSearchService;
 import org.opensearch.search.SearchHit;
@@ -2596,10 +2595,10 @@ public abstract class OpenSearchIntegTestCase extends OpenSearchTestCase {
         return buildRemoteStoreNodeAttributes(
             segmentRepoName,
             segmentRepoPath,
-            ReloadableFsRepository.TYPE,
+            "mock",
             translogRepoName,
             translogRepoPath,
-            ReloadableFsRepository.TYPE,
+            "mock",
             withRateLimiterAttributes
         );
     }

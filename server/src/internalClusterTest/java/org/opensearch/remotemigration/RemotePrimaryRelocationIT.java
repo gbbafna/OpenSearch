@@ -23,17 +23,16 @@ import org.opensearch.common.unit.TimeValue;
 import org.opensearch.core.common.unit.ByteSizeValue;
 import org.opensearch.index.query.QueryBuilders;
 import org.opensearch.indices.recovery.RecoverySettings;
-import org.opensearch.plugins.Plugin;
+import org.opensearch.test.InternalTestCluster;
 import org.opensearch.test.OpenSearchIntegTestCase;
 import org.opensearch.test.hamcrest.OpenSearchAssertions;
-import org.opensearch.test.transport.MockTransportService;
+import org.opensearch.test.junit.annotations.TestIssueLogging;
 
-import java.util.Collection;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static java.util.Arrays.asList;
 import static org.opensearch.node.remotestore.RemoteStoreNodeService.MIGRATION_DIRECTION_SETTING;
 import static org.opensearch.node.remotestore.RemoteStoreNodeService.REMOTE_STORE_COMPATIBILITY_MODE_SETTING;
 import static org.opensearch.test.hamcrest.OpenSearchAssertions.assertAcked;
@@ -49,10 +48,6 @@ public class RemotePrimaryRelocationIT extends MigrationBaseTestCase {
 
     protected int maximumNumberOfReplicas() {
         return 0;
-    }
-
-    protected Collection<Class<? extends Plugin>> nodePlugins() {
-        return asList(MockTransportService.TestPlugin.class);
     }
 
     public void testRemotePrimaryRelocation() throws Exception {
@@ -178,7 +173,7 @@ public class RemotePrimaryRelocationIT extends MigrationBaseTestCase {
         String remoteNode = internalCluster().startNode();
         internalCluster().validateClusterFormed();
 
-        setFailRate(REPOSITORY_NAME, 100);
+        setFailRate(REPOSITORY_NAME, 1);
         client().admin()
             .cluster()
             .prepareUpdateSettings()
@@ -215,6 +210,97 @@ public class RemotePrimaryRelocationIT extends MigrationBaseTestCase {
         ClusterHealthResponse actionGet = client().admin().cluster().health(healthRequest).actionGet();
         assertEquals(actionGet.getRelocatingShards(), 0);
         assertEquals(docRepNode, primaryNodeName(INDEX_NAME));
+
+        asyncIndexingService.stopIndexing();
+        client().admin()
+            .cluster()
+            .prepareUpdateSettings()
+            .setTransientSettings(Settings.builder().put(RecoverySettings.INDICES_INTERNAL_REMOTE_UPLOAD_TIMEOUT.getKey(), (String) null))
+            .get();
+    }
+
+    /*
+    Asserts in case of failed relocation, new remote node cleans up files uploaded by previous node.
+     */
+    @TestIssueLogging(value = "_root:DEBUG,org.opensearch.index.store.RemoteSegmentStoreDirectory:TRACE", issueUrl = "https://github.com/elastic/elasticsearch/issues/41068")
+    public void testMixedModeRelocation_RemoteSeeding_CleanUp() throws Exception {
+        String docRepNode = internalCluster().startNode();
+        ClusterUpdateSettingsRequest updateSettingsRequest = new ClusterUpdateSettingsRequest();
+        updateSettingsRequest.persistentSettings(Settings.builder().put(REMOTE_STORE_COMPATIBILITY_MODE_SETTING.getKey(), "mixed"));
+        assertAcked(client().admin().cluster().updateSettings(updateSettingsRequest).actionGet());
+
+        // create shard with 0 replica and 1 shard
+        client().admin().indices().prepareCreate(INDEX_NAME).setSettings(indexSettings()).setMapping("field", "type=text").get();
+        ensureGreen(INDEX_NAME);
+
+        AsyncIndexingService asyncIndexingService = new AsyncIndexingService(INDEX_NAME);
+        asyncIndexingService.startIndexing();
+
+        refresh(INDEX_NAME);
+
+        // add remote node in mixed mode cluster
+        setAddRemote(true);
+        String remoteNode = internalCluster().startNode();
+        internalCluster().validateClusterFormed();
+
+        setRegExToFail(REPOSITORY_NAME, "segments_");
+        client().admin()
+            .cluster()
+            .prepareUpdateSettings()
+            .setTransientSettings(Settings.builder().put(RecoverySettings.INDICES_INTERNAL_REMOTE_UPLOAD_TIMEOUT.getKey(), "10s"))
+            .get();
+
+        // Change direction to remote store
+        updateSettingsRequest.persistentSettings(Settings.builder().put(MIGRATION_DIRECTION_SETTING.getKey(), "remote_store"));
+        assertAcked(client().admin().cluster().updateSettings(updateSettingsRequest).actionGet());
+
+        logger.info("--> relocating from {} to {} ", docRepNode, remoteNode);
+        client().admin()
+            .cluster()
+            .prepareReroute()
+            .add(new MoveAllocationCommand(INDEX_NAME, 0, docRepNode, remoteNode))
+            .execute()
+            .actionGet();
+        ClusterHealthResponse clusterHealthResponse = client().admin()
+            .cluster()
+            .prepareHealth()
+            .setTimeout(TimeValue.timeValueSeconds(5))
+            .setWaitForEvents(Priority.LANGUID)
+            .setWaitForNoRelocatingShards(true)
+            .execute()
+            .actionGet();
+
+        assertTrue(clusterHealthResponse.getRelocatingShards() == 1);
+        // waiting more than waitForRemoteStoreSync's sleep time of 30 sec to deterministically fail
+        Thread.sleep(40000);
+
+        ClusterHealthRequest healthRequest = Requests.clusterHealthRequest()
+            .waitForNoRelocatingShards(true)
+            .waitForNoInitializingShards(true);
+        ClusterHealthResponse actionGet = client().admin().cluster().health(healthRequest).actionGet();
+        assertEquals(actionGet.getRelocatingShards(), 0);
+        assertEquals(docRepNode, primaryNodeName(INDEX_NAME));
+
+        internalCluster().stopRandomNode(InternalTestCluster.nameFilter(remoteNode));
+        setRegExToFail(REPOSITORY_NAME, null);
+        long before = System.currentTimeMillis();
+        remoteNode = internalCluster().startNode();
+        client().admin()
+            .cluster()
+            .prepareReroute()
+            .add(new MoveAllocationCommand(INDEX_NAME, 0, docRepNode, remoteNode))
+            .execute()
+            .actionGet();
+        waitForRelocation();
+        assertEquals(remoteNode, primaryNodeName(INDEX_NAME));
+        String indexUUID = client().admin()
+            .indices()
+            .prepareGetSettings(INDEX_NAME)
+            .get()
+            .getSetting(INDEX_NAME, IndexMetadata.SETTING_INDEX_UUID);
+        // assert files got recreated as new node should delete files created by previous node .
+        Path indexPath = Path.of(String.valueOf(segmentRepoPath), indexUUID);
+        assertTrue(getOldestFileCreationTime(indexPath) > before);
 
         asyncIndexingService.stopIndexing();
         client().admin()

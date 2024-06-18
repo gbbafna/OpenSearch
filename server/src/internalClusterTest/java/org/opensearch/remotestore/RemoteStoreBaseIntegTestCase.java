@@ -42,6 +42,7 @@ import org.opensearch.remotestore.translogmetadata.mocks.MockFsMetadataSupported
 import org.opensearch.repositories.RepositoriesService;
 import org.opensearch.repositories.blobstore.BlobStoreRepository;
 import org.opensearch.repositories.fs.ReloadableFsRepository;
+import org.opensearch.snapshots.mockstore.MockRepository;
 import org.opensearch.test.OpenSearchIntegTestCase;
 import org.junit.After;
 
@@ -143,7 +144,8 @@ public class RemoteStoreBaseIntegTestCase extends OpenSearchIntegTestCase {
                 return Stream.concat(super.nodePlugins().stream(), Stream.of(MockFsMetadataSupportedRepositoryPlugin.class))
                     .collect(Collectors.toList());
             } else {
-                return Stream.concat(super.nodePlugins().stream(), Stream.of(MockFsRepositoryPlugin.class)).collect(Collectors.toList());
+                return Stream.concat(super.nodePlugins().stream(), Stream.of(MockFsRepositoryPlugin.class, MockRepository.Plugin.class))
+                    .collect(Collectors.toList());
             }
         }
         return super.nodePlugins();
@@ -159,7 +161,7 @@ public class RemoteStoreBaseIntegTestCase extends OpenSearchIntegTestCase {
             return Settings.builder().put(super.nodeSettings(nodeOrdinal)).build();
         } else {
             if (asyncUploadMockFsRepo) {
-                String repoType = metadataSupportedType ? MockFsMetadataSupportedRepositoryPlugin.TYPE_MD : MockFsRepositoryPlugin.TYPE;
+                String repoType = metadataSupportedType ? MockFsMetadataSupportedRepositoryPlugin.TYPE_MD : "mock";
                 return Settings.builder()
                     .put(super.nodeSettings(nodeOrdinal))
                     .put(
