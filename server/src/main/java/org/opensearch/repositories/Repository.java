@@ -399,7 +399,7 @@ public interface Repository extends LifecycleComponent {
      * @param shardId    shard id
      * @return snapshot status
      */
-    default IndexShardSnapshotStatus getShardSnapshotStatusV2(SnapshotInfo snapshotInfo, IndexId indexId, ShardId shardId) {
+    default IndexShardSnapshotStatus getShardSnapshotStatus(SnapshotInfo snapshotInfo, IndexId indexId, ShardId shardId) {
         return getShardSnapshotStatus(snapshotInfo.snapshotId(), indexId, shardId);
     }
 

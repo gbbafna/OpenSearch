@@ -3285,8 +3285,8 @@ public abstract class BlobStoreRepository extends AbstractLifecycleComponent imp
         return snapshot.getIndexShardSnapshotStatus();
     }
 
-    public IndexShardSnapshotStatus getShardSnapshotStatusV2(SnapshotInfo snapshotInfo, IndexId indexId, ShardId shardId) {
-        IndexShardSnapshot snapshot = loadShardSnapshotV2(shardContainer(indexId, shardId), snapshotInfo);
+    public IndexShardSnapshotStatus getShardSnapshotStatus(SnapshotInfo snapshotInfo, IndexId indexId, ShardId shardId) {
+        IndexShardSnapshot snapshot = loadShardSnapshot(shardContainer(indexId, shardId), snapshotInfo);
         return snapshot.getIndexShardSnapshotStatus();
     }
 
@@ -3487,11 +3487,6 @@ public abstract class BlobStoreRepository extends AbstractLifecycleComponent imp
             } else if (shardContainer.blobExists(REMOTE_STORE_SHARD_SHALLOW_COPY_SNAPSHOT_FORMAT.blobName(snapshotId.getUUID()))) {
                 return REMOTE_STORE_SHARD_SHALLOW_COPY_SNAPSHOT_FORMAT.read(shardContainer, snapshotId.getUUID(), namedXContentRegistry);
             } else {
-//                if (shardContainer.listBlobs().size() == 0 && clusterService.getClusterSettings().get(SnapshotsService.SHALLOW_SNAPSHOT_V2)
-//                && REMOTE_STORE_INDEX_SHALLOW_COPY.get(metadata.settings())) {
-//                    // ToDo fix me :This is still approximate
-//                    return () -> IndexShardSnapshotStatus.newDone(0L, 0L, 0, 0, 0, 0, "1");
-//                }
                 throw new SnapshotMissingException(metadata.name(), snapshotId.getName());
             }
         } catch (IOException ex) {
@@ -3504,7 +3499,7 @@ public abstract class BlobStoreRepository extends AbstractLifecycleComponent imp
         }
     }
 
-    public IndexShardSnapshot loadShardSnapshotV2(BlobContainer shardContainer,  SnapshotInfo snapshotInfo) {
+    public IndexShardSnapshot loadShardSnapshot(BlobContainer shardContainer, SnapshotInfo snapshotInfo) {
         try {
             SnapshotId snapshotId = snapshotInfo.snapshotId();
             if (snapshotInfo.getPinnedTimestamp() !=0) {

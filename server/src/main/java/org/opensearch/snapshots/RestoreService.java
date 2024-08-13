@@ -552,7 +552,7 @@ public class RestoreService implements ClusterStateApplier {
                                 for (int shard = 0; shard < snapshotIndexMetadata.getNumberOfShards(); shard++) {
                                     if (isRemoteSnapshot) {
                                         IndexShardSnapshotStatus.Copy shardStatus = repository.getShardSnapshotStatus(
-                                            snapshotInfo.snapshotId(),
+                                            snapshotInfo,
                                             snapshotIndexId,
                                             new ShardId(metadata.index(index).getIndex(), shard)
                                         ).asCopy();
