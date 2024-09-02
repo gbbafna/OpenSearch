@@ -225,7 +225,7 @@ final class S3ClientSettings {
     static final Setting.AffixSetting<Integer> MAX_RETRIES_SETTING = Setting.affixKeySetting(
         PREFIX,
         "max_retries",
-        key -> Setting.intSetting(key, 3, 0, Property.NodeScope)
+        key -> Setting.intSetting(key, 10, 0, Property.NodeScope)
     );
 
     /** Whether retries should be throttled (ie use backoff). */

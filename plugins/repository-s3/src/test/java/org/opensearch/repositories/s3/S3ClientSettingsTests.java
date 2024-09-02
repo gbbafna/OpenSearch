@@ -78,6 +78,7 @@ public class S3ClientSettingsTests extends AbstractS3RepositoryTestCase {
         assertThat(defaultSettings.connectionAcquisitionTimeoutMillis, is(15 * 60 * 1000));
         assertThat(defaultSettings.maxRetries, is(3));
         assertThat(defaultSettings.throttleRetries, is(true));
+
     }
 
     public void testDefaultClientSettingsCanBeSet() {
