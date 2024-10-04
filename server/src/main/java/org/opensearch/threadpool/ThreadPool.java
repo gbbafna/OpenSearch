@@ -38,6 +38,7 @@ import org.apache.logging.log4j.message.ParameterizedMessage;
 import org.opensearch.Version;
 import org.opensearch.common.Nullable;
 import org.opensearch.common.annotation.PublicApi;
+import org.opensearch.common.settings.ClusterSettings;
 import org.opensearch.common.settings.Setting;
 import org.opensearch.common.settings.Settings;
 import org.opensearch.common.unit.SizeValue;
@@ -211,6 +212,9 @@ public class ThreadPool implements ReportingService<ThreadPoolInfo>, Scheduler {
 
     private final ScheduledThreadPoolExecutor scheduler;
 
+    private ClusterSettings clusterSettings = null;
+
+
     public Collection<ExecutorBuilder> builders() {
         return Collections.unmodifiableCollection(builders.values());
     }
@@ -224,6 +228,30 @@ public class ThreadPool implements ReportingService<ThreadPoolInfo>, Scheduler {
 
     public ThreadPool(final Settings settings, final ExecutorBuilder<?>... customBuilders) {
         this(settings, null, customBuilders);
+    }
+
+    public static final Setting<Integer> THREADPOOL_SNAPSHOT_SETTING = Setting.intSetting(
+        "cluster.thread_pool.snapshot",
+        -1,
+        -1,
+        Setting.Property.NodeScope,
+        Setting.Property.Dynamic
+    );
+
+    public void setSnapshotThread(int snapshotThread) {
+        OpenSearchThreadPoolExecutor o = (OpenSearchThreadPoolExecutor) this.executors.get(Names.SNAPSHOT).executor;
+        if (snapshotThread != -1) {
+            o.setCorePoolSize(snapshotThread);
+            o.setMaximumPoolSize(snapshotThread);
+        }
+    }
+
+    public void setClusterSettings(ClusterSettings clusterSettings) {
+        this.clusterSettings = clusterSettings;
+        this.clusterSettings.addSettingsUpdateConsumer(
+            THREADPOOL_SNAPSHOT_SETTING,
+            this::setSnapshotThread
+        );
     }
 
     public ThreadPool(
