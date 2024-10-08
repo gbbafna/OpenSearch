@@ -804,8 +804,8 @@ public final class ClusterSettings extends AbstractScopedSettings {
                 ResponseLimitSettings.CAT_SHARDS_RESPONSE_LIMIT_SETTING,
                 ResponseLimitSettings.CAT_SEGMENTS_RESPONSE_LIMIT_SETTING,
 
-                //Thread pool
-                ThreadPool.THREADPOOL_SNAPSHOT_SETTING
+                // Thread pool Settings
+                ThreadPool.CLUSTER_THREAD_POOL_SIZE_SETTING
             )
         )
     );

@@ -214,7 +214,6 @@ public class ThreadPool implements ReportingService<ThreadPoolInfo>, Scheduler {
 
     private ClusterSettings clusterSettings = null;
 
-
     public Collection<ExecutorBuilder> builders() {
         return Collections.unmodifiableCollection(builders.values());
     }
@@ -226,32 +225,68 @@ public class ThreadPool implements ReportingService<ThreadPoolInfo>, Scheduler {
         Setting.Property.NodeScope
     );
 
+    public static final Setting<Settings> CLUSTER_THREAD_POOL_SIZE_SETTING = Setting.groupSetting("cluster.thread_pool.", (tpSettings) -> {
+        Map<String, Settings> tpGroups = tpSettings.getAsGroups();
+        for (Map.Entry<String, Settings> entry : tpGroups.entrySet()) {
+            String tpName = entry.getKey();
+            Settings tpGroup = entry.getValue();
+            int max = tpGroup.getAsInt("max", 1);
+            int core = tpGroup.getAsInt("core", 1);
+            int size = tpGroup.getAsInt("size", 1);
+            if (max <= 0 || core <= 0 || size <= 0) {
+                throw new IllegalArgumentException("illegal value for [cluster.thread_pool." + tpName + "], has to be positive value");
+            }
+        }
+    },
+        Setting.Property.Dynamic,
+        Setting.Property.NodeScope
+
+    );
+
     public ThreadPool(final Settings settings, final ExecutorBuilder<?>... customBuilders) {
         this(settings, null, customBuilders);
     }
 
-    public static final Setting<Integer> THREADPOOL_SNAPSHOT_SETTING = Setting.intSetting(
-        "cluster.thread_pool.snapshot",
-        -1,
-        -1,
-        Setting.Property.NodeScope,
-        Setting.Property.Dynamic
-    );
-
-    public void setSnapshotThread(int snapshotThread) {
-        OpenSearchThreadPoolExecutor o = (OpenSearchThreadPoolExecutor) this.executors.get(Names.SNAPSHOT).executor;
-        if (snapshotThread != -1) {
-            o.setCorePoolSize(snapshotThread);
-            o.setMaximumPoolSize(snapshotThread);
+    public void setThreadPool(Settings tpSettings) {
+        Map<String, Settings> tpGroups = tpSettings.getAsGroups();
+        for (Map.Entry<String, Settings> entry : tpGroups.entrySet()) {
+            String tpName = entry.getKey();
+            Settings tpGroup = entry.getValue();
+            ExecutorHolder holder = executors.get(tpName);
+            assert holder.executor instanceof OpenSearchThreadPoolExecutor;
+            OpenSearchThreadPoolExecutor o = (OpenSearchThreadPoolExecutor) holder.executor;
+            if (holder.info.type == ThreadPoolType.SCALING) {
+                int max = tpGroup.getAsInt("max", o.getMaximumPoolSize());
+                int core = tpGroup.getAsInt("core", o.getCorePoolSize());
+                if (core > max) {
+                    // Can we do better than silently ignoring this as this can't be caught in static validation ?
+                    logger.error("Thread pool {} core {} is higher than maximum value {}. Ignoring it", tpName, core, max);
+                    continue;
+                }
+                // Below check makes sure we adhere to the constraint that cores <= max at all the time.
+                if (core < o.getCorePoolSize()) {
+                    o.setCorePoolSize(core);
+                    o.setMaximumPoolSize(max);
+                } else {
+                    o.setMaximumPoolSize(max);
+                    o.setCorePoolSize(core);
+                }
+            } else {
+                int size = tpGroup.getAsInt("size", o.getMaximumPoolSize());
+                if (size < o.getCorePoolSize()) {
+                    o.setCorePoolSize(size);
+                    o.setMaximumPoolSize(size);
+                } else {
+                    o.setMaximumPoolSize(size);
+                    o.setCorePoolSize(size);
+                }
+            }
         }
     }
 
     public void setClusterSettings(ClusterSettings clusterSettings) {
         this.clusterSettings = clusterSettings;
-        this.clusterSettings.addSettingsUpdateConsumer(
-            THREADPOOL_SNAPSHOT_SETTING,
-            this::setSnapshotThread
-        );
+        this.clusterSettings.addSettingsUpdateConsumer(CLUSTER_THREAD_POOL_SIZE_SETTING, this::setThreadPool);
     }
 
     public ThreadPool(
