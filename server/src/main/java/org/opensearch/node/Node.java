@@ -568,7 +568,7 @@ public class Node implements Closeable {
             final List<ExecutorBuilder<?>> executorBuilders = pluginsService.getExecutorBuilders(settings);
 
             runnableTaskListener = new AtomicReference<>();
-            final ThreadPool threadPool = new ThreadPool(settings, runnableTaskListener, executorBuilders.toArray(new ExecutorBuilder[0]));
+            final ThreadPool threadPool = new ThreadPool(settings, runnableTaskListener,  executorBuilders.toArray(new ExecutorBuilder[0]));
 
             final IdentityService identityService = new IdentityService(settings, threadPool, identityPlugins);
 
@@ -624,6 +624,7 @@ public class Node implements Closeable {
                 additionalSettingsFilter,
                 settingsUpgraders
             );
+            threadPool.setClusterSettings(settingsModule.getClusterSettings());
             scriptModule.registerClusterSettingsListeners(scriptService, settingsModule.getClusterSettings());
             final NetworkService networkService = new NetworkService(
                 getCustomNameResolvers(pluginsService.filterPlugins(DiscoveryPlugin.class))
