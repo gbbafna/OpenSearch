@@ -618,6 +618,7 @@ public class SnapshotsService extends AbstractLifecycleComponent implements Clus
                                 return;
                             }
                             listener.onResponse(snapshotInfo);
+                            logger.info("[{}] created snapshot-v2 [{}]", repositoryName, snapshotName);
                             // For snapshot-v2, we don't allow concurrent snapshots . But meanwhile non-v2 snapshot operations
                             // can get queued . This is triggering them.
                             runNextQueuedOperation(repositoryData, repositoryName, true);
@@ -2216,12 +2217,14 @@ public class SnapshotsService extends AbstractLifecycleComponent implements Clus
         final Tuple<SnapshotsInProgress.Entry, Metadata> nextFinalization = repositoryOperations.pollFinalization(repository);
         if (nextFinalization == null) {
             if (attemptDelete) {
+                logger.info("Attempting delete now runNextQueuedOperation");
                 runReadyDeletions(repositoryData, repository);
             } else {
+                logger.info("Leaving repo loop from runNextQueuedOperation");
                 leaveRepoLoop(repository);
             }
         } else {
-            logger.trace("Moving on to finalizing next snapshot [{}]", nextFinalization);
+            logger.info("Moving on to finalizing next snapshot [{}]", nextFinalization);
             finalizeSnapshotEntry(nextFinalization.v1(), nextFinalization.v2(), repositoryData);
         }
     }
