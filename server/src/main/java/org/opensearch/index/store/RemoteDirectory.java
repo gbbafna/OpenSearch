@@ -142,6 +142,9 @@ public class RemoteDirectory extends Directory {
             throw new IOException("Exception in listFilesByPrefixInLexicographicOrder with prefix: " + filenamePrefix, e);
         }
         if (exception.get() != null) {
+            if (exception.get() instanceof  NoSuchFileException) {
+                return sortedBlobList;
+            }
             throw new IOException(exception.get());
         } else {
             return sortedBlobList;

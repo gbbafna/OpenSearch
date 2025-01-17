@@ -902,7 +902,7 @@ public final class RemoteSegmentStoreDirectory extends FilterDirectory implement
             .filter(metadataFile -> allLockFiles.contains(metadataFile) == false)
             .collect(Collectors.toList());
 
-        logger.debug(
+        logger.info(
             "metadataFilesEligibleToDelete={} metadataFilesToBeDeleted={}",
             metadataFilesEligibleToDelete,
             metadataFilesToBeDeleted

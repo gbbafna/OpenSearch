@@ -2159,7 +2159,7 @@ public class IndexShard extends AbstractIndexShardComponent implements IndicesCl
         }
         throw new IOException(
             "Failed to upload to remote segment store within remote upload timeout of "
-                + getRecoverySettings().internalRemoteUploadTimeout().getMinutes()
+                + getRecoverySettings().internalRemoteUploadTimeout().getSeconds()
                 + " minutes"
         );
     }
@@ -5032,6 +5032,7 @@ public class IndexShard extends AbstractIndexShardComponent implements IndicesCl
     public void deleteRemoteStoreContents() throws IOException {
         deleteTranslogFilesFromRemoteTranslog();
         getRemoteDirectory().delete();
+        //getRemoteDirectory().deleteStaleSegments(0);
     }
 
     public void syncTranslogFilesFromRemoteTranslog() throws IOException {
