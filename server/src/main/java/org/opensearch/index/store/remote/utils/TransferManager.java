@@ -12,6 +12,8 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.apache.lucene.store.IOContext;
 import org.apache.lucene.store.IndexInput;
+import org.opensearch.index.WarmPerQueryMetric;
+import org.opensearch.index.WarmQueryMetricService;
 import org.opensearch.index.store.remote.filecache.CachedIndexInput;
 import org.opensearch.index.store.remote.filecache.FileCache;
 import org.opensearch.index.store.remote.filecache.FileCachedIndexInput;
@@ -74,13 +76,19 @@ public class TransferManager {
 
         try {
             return AccessController.doPrivileged((PrivilegedExceptionAction<IndexInput>) () -> {
+                WarmPerQueryMetric m = WarmQueryMetricService.getInstance().getMetricCollector(Thread.currentThread().threadId());
                 CachedIndexInput cacheEntry = fileCache.compute(key, (path, cachedIndexInput) -> {
                     if (cachedIndexInput == null || cachedIndexInput.isClosed()) {
                         logger.trace("Transfer Manager - IndexInput closed or not in cache");
                         // Doesn't exist or is closed, either way create a new one
+                        //SlowLog ToDo : Cache Miss
+                        m.recordFileAccess(key.toString(), false);
                         return new DelayedCreationCachedIndexInput(fileCache, streamReader, blobFetchRequest);
                     } else {
                         logger.trace("Transfer Manager - Already in cache");
+                        m.recordFileAccess(key.toString(), true);
+
+                        //SlowLog ToDo : Cache Hit
                         // already in the cache and ready to be used (open)
                         return cachedIndexInput;
                     }
@@ -136,7 +144,13 @@ public class TransferManager {
                                 blobPart.getLength()
                             );
                         ) {
+                            //started one read
                             snapshotFileInputStream.transferTo(localFileOutputStream);
+                            // completed read
+                            //Slow Log ToDo: Add download success stats
+                        } catch (IOException e) {
+                            //Slow Log ToDo: Add download failure stats
+                            throw e;
                         }
                     }
                 }
