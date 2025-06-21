@@ -14,6 +14,7 @@ import org.apache.lucene.store.IOContext;
 import org.apache.lucene.store.IndexInput;
 import org.opensearch.index.WarmPerQueryMetric;
 import org.opensearch.index.WarmQueryMetricService;
+import org.opensearch.index.store.remote.file.OnDemandBlockSnapshotIndexInput;
 import org.opensearch.index.store.remote.filecache.CachedIndexInput;
 import org.opensearch.index.store.remote.filecache.FileCache;
 import org.opensearch.index.store.remote.filecache.FileCachedIndexInput;
@@ -137,6 +138,9 @@ public class TransferManager {
                     OutputStream localFileOutputStream = new BufferedOutputStream(fileOutputStream)
                 ) {
                     for (BlobFetchRequest.BlobPart blobPart : request.blobParts()) {
+                        WarmPerQueryMetric m = WarmQueryMetricService.getInstance().getMetricCollector(Thread.currentThread().threadId());
+                        String fileName = OnDemandBlockSnapshotIndexInput.getFileName(blobPart.getBlobName());
+                        final long downloadStartTime = System.nanoTime();
                         try (
                             InputStream snapshotFileInputStream = streamReader.read(
                                 blobPart.getBlobName(),
@@ -146,10 +150,10 @@ public class TransferManager {
                         ) {
                             //started one read
                             snapshotFileInputStream.transferTo(localFileOutputStream);
-                            // completed read
-                            //Slow Log ToDo: Add download success stats
+                            //ToDo : Test me out - once we have eviction of clones working
+                            m.recordDownload(fileName, blobPart.getLength(), downloadStartTime, System.nanoTime(), false);
                         } catch (IOException e) {
-                            //Slow Log ToDo: Add download failure stats
+                            m.recordDownload(fileName, blobPart.getLength(), downloadStartTime, System.nanoTime(), true);
                             throw e;
                         }
                     }

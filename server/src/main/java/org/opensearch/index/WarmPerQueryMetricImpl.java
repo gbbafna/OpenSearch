@@ -1,5 +1,7 @@
 package org.opensearch.index;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.apache.lucene.util.Accountable;
 import org.apache.lucene.util.RamUsageEstimator;
 
@@ -20,6 +22,7 @@ public class WarmPerQueryMetricImpl implements WarmPerQueryMetric {
         WarmPerQueryMetricImpl.class);
     private static final long FULL_FILE_BASE_RAM_BYTES_USED = RamUsageEstimator.shallowSizeOfInstance(RemoteStoreStatFullFile.class);
     private static final long FC_BASE_RAM_BYTES_USED = RamUsageEstimator.shallowSizeOfInstance(FileCacheStat.class);
+    private static final Logger logger = LogManager.getLogger(WarmPerQueryMetricImpl.class);
 
 
     // File Cache stats will include hit/miss for both block and full file
@@ -72,13 +75,13 @@ public class WarmPerQueryMetricImpl implements WarmPerQueryMetric {
 
         if (fileParts.length == 2) {
             //SlowLog ToDo - fix me .
-            // ignore the 4th part which is the block extension
             return new FileBlock(fileParts[0], Integer.parseInt(fileParts[1]));
         } else {
             assert false : "getFileBlock called with invalid block name, possibly without the extension";
             return new FileBlock(blockFileName, -1);
         }
     }
+
 
     @Override
     public void recordDownload(String fileName, long bytesDownloaded, long startTime, long endTime, boolean failed) {
@@ -146,8 +149,6 @@ public class WarmPerQueryMetricImpl implements WarmPerQueryMetric {
             fileCacheStat.missBlocks.add(fileBlock.blockId);
         }
     }
-
-
 
     @Override
     public void recordFullFileAccess(String fullFileName, boolean hit) {

@@ -58,6 +58,13 @@ public class OnDemandBlockSnapshotIndexInput extends OnDemandBlockIndexInput {
      */
     protected final long originalFileSize;
 
+    public static final String block = "_block_";
+
+    //ToDo : Move suitably
+    public static String getFileName(String blockName) {
+        return blockName.split(OnDemandBlockSnapshotIndexInput.block)[0];
+    }
+
     public OnDemandBlockSnapshotIndexInput(FileInfo fileInfo, FSDirectory directory, TransferManager transferManager) {
         this(
             "BlockedSnapshotIndexInput(path=\""
