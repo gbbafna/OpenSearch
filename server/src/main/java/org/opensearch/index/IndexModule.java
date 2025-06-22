@@ -291,7 +291,9 @@ public final class IndexModule {
         this.engineFactory = Objects.requireNonNull(engineFactory);
         this.engineConfigFactory = Objects.requireNonNull(engineConfigFactory);
         this.searchOperationListeners.add(new SearchSlowLog(indexSettings));
-        this.searchOperationListeners.add(new WarmSearchSlowLog(indexSettings));
+        if (indexSettings.isAssignedOnWarmNode()) {
+            this.searchOperationListeners.add(new WarmSearchSlowLog(indexSettings));
+        }
         this.indexOperationListeners.add(new IndexingSlowLog(indexSettings));
         this.directoryFactories = Collections.unmodifiableMap(directoryFactories);
         this.compositeDirectoryFactories = Collections.unmodifiableMap(compositeDirectoryFactories);

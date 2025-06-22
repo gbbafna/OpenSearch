@@ -52,7 +52,7 @@ public final class WarmSearchSlowLog implements SearchOperationListener {
     private static final String WARM_SEARCH_SLOWLOG_PREFIX = "index.warm.slowlog";
     public static final Setting<TimeValue> INDEX_SEARCH_SLOWLOG_THRESHOLD_QUERY_WARN_SETTING =
         Setting.timeSetting(WARM_SEARCH_SLOWLOG_PREFIX + ".threshold.query.warn", TimeValue.timeValueMillis(10000),
-            TimeValue.timeValueMillis(0), Property.Dynamic, Property.IndexScope);
+            TimeValue.timeValueMillis(-1), Property.Dynamic, Property.IndexScope);
     public static final Setting<TimeValue> INDEX_SEARCH_SLOWLOG_THRESHOLD_QUERY_INFO_SETTING =
         Setting.timeSetting(WARM_SEARCH_SLOWLOG_PREFIX + ".threshold.query.info", TimeValue.timeValueMillis(5000),
             TimeValue.timeValueMillis(-1), Property.Dynamic, Property.IndexScope);

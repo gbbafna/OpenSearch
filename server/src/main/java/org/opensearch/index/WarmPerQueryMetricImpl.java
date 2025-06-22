@@ -212,13 +212,13 @@ public class WarmPerQueryMetricImpl implements WarmPerQueryMetric {
     }
 
     private String getSummary() {
-        return String.format("{S3: %d mb in %d ms, FC: %d hits out of %d total, Prefetch Files: %s, ReadAhead Files: %s, Full File S3: %d mb in %d ms, Full File FC: %d hits out of %d total}",
+        return String.format("{Remote: %d mb in %d ms, FC: %d hits out of %d total, Prefetch Files: %s, ReadAhead Files: %s, Full File Remote: %d mb in %d ms, Full File FC: %d hits out of %d total}",
             this.effectiveBytes / BYTES_IN_MB, TimeUnit.NANOSECONDS.toMillis(getTotalDownloadTime()), this.hits, this.hits + this.miss, this.prefetchFiles, this.readAheadFiles,
             this.fullFileEffectiveBytes / BYTES_IN_MB, TimeUnit.NANOSECONDS.toMillis(this.fullFileElapsedTimeNanos), this.fullFileHits, this.fullFileHits + this.fullFileMiss);
     }
 
     private String getDetails() {
-        return String.format("{S3: %s, FC: %s, Full File S3: %s, Full File FC: %s}",
+        return String.format("{Remote: %s, FC: %s, Full File Remote: %s, Full File FC: %s}",
             this.remoteStoreStats, this.fileCacheStats, this.fullFileS3ServiceStats, this.fullFileCacheStats);
     }
 

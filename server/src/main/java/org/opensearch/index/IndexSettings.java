@@ -36,6 +36,7 @@ import org.apache.lucene.index.MergePolicy;
 import org.apache.lucene.sandbox.index.MergeOnFlushMergePolicy;
 import org.opensearch.Version;
 import org.opensearch.cluster.metadata.IndexMetadata;
+import org.opensearch.cluster.node.DiscoveryNode;
 import org.opensearch.common.annotation.PublicApi;
 import org.opensearch.common.logging.Loggers;
 import org.opensearch.common.settings.IndexScopedSettings;
@@ -837,6 +838,7 @@ public final class IndexSettings {
     private volatile String defaultSearchPipeline;
     private final boolean widenIndexSortType;
     private final boolean assignedOnRemoteNode;
+    private final boolean assignedOnWarmNode;
     private final RemoteStorePathStrategy remoteStorePathStrategy;
     private final boolean isTranslogMetadataEnabled;
     private volatile boolean allowDerivedField;
@@ -1088,6 +1090,7 @@ public final class IndexSettings {
          */
         widenIndexSortType = IndexMetadata.SETTING_INDEX_VERSION_CREATED.get(settings).before(V_2_7_0);
         assignedOnRemoteNode = RemoteStoreNodeAttribute.isRemoteDataAttributePresent(this.getNodeSettings());
+        assignedOnWarmNode = DiscoveryNode.isWarmNode(this.getNodeSettings());
         remoteStorePathStrategy = RemoteStoreUtils.determineRemoteStorePathStrategy(indexMetadata);
 
         isTranslogMetadataEnabled = RemoteStoreUtils.determineTranslogMetadataEnabled(indexMetadata);
@@ -1402,6 +1405,10 @@ public final class IndexSettings {
 
     public boolean isAssignedOnRemoteNode() {
         return assignedOnRemoteNode;
+    }
+
+    public boolean isAssignedOnWarmNode() {
+        return assignedOnWarmNode;
     }
 
     /**
