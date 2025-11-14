@@ -42,6 +42,7 @@ import org.opensearch.common.UUIDs;
 import org.opensearch.common.annotation.PublicApi;
 import org.opensearch.common.lucene.Lucene;
 import org.opensearch.common.util.CancellableThreads;
+import org.opensearch.common.util.FeatureFlags;
 import org.opensearch.core.Assertions;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.common.bytes.BytesReference;
@@ -382,7 +383,10 @@ public class RecoveryTarget extends ReplicationTarget implements RecoveryTargetH
                 // in their store. In these cases, reuse the primary's translog UUID.
                 final boolean reuseTranslogUUID = indexShard.indexSettings().isSegRepEnabledOrRemoteNode()
                     || indexShard.indexSettings().isRemoteSnapshot();
-                if (reuseTranslogUUID) {
+                if (FeatureFlags.SHARED_STORAGE_SETTING.get(indexShard.indexSettings().getNodeSettings())) {
+                    //do notihng
+                }
+                else if (reuseTranslogUUID) {
                     final String translogUUID = store.getMetadata().getCommitUserData().get(TRANSLOG_UUID_KEY);
                     Translog.createEmptyTranslog(
                         indexShard.shardPath().resolveTranslog(),

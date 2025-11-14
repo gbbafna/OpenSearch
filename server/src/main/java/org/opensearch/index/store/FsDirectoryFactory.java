@@ -42,6 +42,7 @@ import org.apache.lucene.store.LockFactory;
 import org.apache.lucene.store.MMapDirectory;
 import org.apache.lucene.store.NIOFSDirectory;
 import org.apache.lucene.store.NativeFSLockFactory;
+import org.apache.lucene.store.NoLockFactory;
 import org.apache.lucene.store.SimpleFSLockFactory;
 import org.opensearch.common.settings.Setting;
 import org.opensearch.common.settings.Setting.Property;
@@ -79,7 +80,19 @@ public class FsDirectoryFactory implements IndexStorePlugin.DirectoryFactory {
     @Override
     public Directory newDirectory(IndexSettings indexSettings, ShardPath path) throws IOException {
         final Path location = path.resolveIndex();
-        final LockFactory lockFactory = indexSettings.getValue(INDEX_LOCK_FACTOR_SETTING);
+        LockFactory lockFactory = indexSettings.getValue(INDEX_LOCK_FACTOR_SETTING);
+        Files.createDirectories(location);
+        return newFSDirectory(location, lockFactory, indexSettings);
+    }
+
+    @Override
+    public Directory newDirectory(IndexSettings indexSettings, ShardPath shardPath, boolean isPrimary) throws IOException {
+        final Path location = shardPath.resolveIndex();
+        LockFactory lockFactory = indexSettings.getValue(INDEX_LOCK_FACTOR_SETTING);
+        if (isPrimary == false) {
+            // ToDo : Add shared storage check here
+            lockFactory = NoLockFactory.INSTANCE;
+        }
         Files.createDirectories(location);
         return newFSDirectory(location, lockFactory, indexSettings);
     }

@@ -75,6 +75,7 @@ import org.opensearch.common.settings.Setting.Property;
 import org.opensearch.common.settings.Settings;
 import org.opensearch.common.unit.TimeValue;
 import org.opensearch.common.util.BigArrays;
+import org.opensearch.common.util.FeatureFlags;
 import org.opensearch.common.util.concurrent.AbstractRefCounted;
 import org.opensearch.common.util.concurrent.AbstractRunnable;
 import org.opensearch.common.util.concurrent.OpenSearchExecutors;
@@ -120,6 +121,7 @@ import org.opensearch.index.engine.MergedSegmentWarmerFactory;
 import org.opensearch.index.engine.NRTReplicationEngineFactory;
 import org.opensearch.index.engine.NoOpEngine;
 import org.opensearch.index.engine.ReadOnlyEngine;
+import org.opensearch.index.engine.ReadOnlyEngineFactory;
 import org.opensearch.index.fielddata.IndexFieldDataCache;
 import org.opensearch.index.flush.FlushStats;
 import org.opensearch.index.get.GetStats;
@@ -146,6 +148,7 @@ import org.opensearch.index.shard.IndexingStats;
 import org.opensearch.index.shard.IndexingStats.Stats.DocStatusStats;
 import org.opensearch.index.store.remote.filecache.FileCache;
 import org.opensearch.index.translog.InternalTranslogFactory;
+import org.opensearch.index.translog.NoOpTranslogFactory;
 import org.opensearch.index.translog.RemoteBlobStoreInternalTranslogFactory;
 import org.opensearch.index.translog.TranslogFactory;
 import org.opensearch.index.translog.TranslogStats;
@@ -745,6 +748,10 @@ public class IndicesService extends AbstractLifecycleComponent
                     RemoteStoreUtils.isServerSideEncryptionEnabledIndex(indexSettings.getIndexMetadata())
                 );
             }
+            else if (indexSettings.isRemoteTranslogStoreEnabled() && shardRouting.primary() == false) {
+                //ToDo : Add shared storage check here
+                return new NoOpTranslogFactory();
+            }
             return new InternalTranslogFactory();
         };
     }
@@ -1171,6 +1178,9 @@ public class IndicesService extends AbstractLifecycleComponent
         if (engineFactories.isEmpty()) {
             if (idxSettings.isRemoteSnapshot()) {
                 return config -> new ReadOnlyEngine(config, new SeqNoStats(0, 0, 0), new TranslogStats(), true, Function.identity(), false);
+            }
+            if (FeatureFlags.SHARED_STORAGE_SETTING.get(idxSettings.getNodeSettings())) {
+                return new ReadOnlyEngineFactory();
             }
             if (idxSettings.isSegRepEnabledOrRemoteNode() || idxSettings.isAssignedOnRemoteNode()) {
                 return new NRTReplicationEngineFactory();

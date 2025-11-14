@@ -70,6 +70,11 @@ public final class RemoteSnapshotDirectoryFactory implements IndexStorePlugin.Di
         }
     }
 
+    @Override
+    public Directory newDirectory(IndexSettings indexSettings, ShardPath shardPath, boolean isPrimary) throws IOException {
+        return newDirectory(indexSettings,shardPath);
+    }
+
     private Future<RemoteSnapshotDirectory> createRemoteSnapshotDirectoryFromSnapshot(
         IndexSettings indexSettings,
         ShardPath localShardPath,

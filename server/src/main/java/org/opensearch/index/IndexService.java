@@ -695,7 +695,7 @@ public class IndexService extends AbstractIndexComponent implements IndicesClust
             boolean seedRemote = false;
             if (targetNode.isRemoteSegmentStoreNode()) {
                 if (this.indexSettings.isRemoteStoreEnabled()) {
-                    remoteDirectory = remoteDirectoryFactory.newDirectory(this.indexSettings, path);
+                    remoteDirectory = remoteDirectoryFactory.newDirectory(this.indexSettings, path, routing.primary());
                 } else {
                     if (sourceNode == null || sourceNode.isRemoteStoreNode() == false) {
                         if (routing.primary() == false) {
@@ -755,7 +755,7 @@ public class IndexService extends AbstractIndexComponent implements IndicesClust
                     threadPool
                 );
             } else {
-                directory = directoryFactory.newDirectory(this.indexSettings, path);
+                directory = directoryFactory.newDirectory(this.indexSettings, path, routing.primary());
             }
             store = storeFactory.newStore(
                 shardId,

@@ -105,6 +105,11 @@ public class MockFSDirectoryFactory implements IndexStorePlugin.DirectoryFactory
         return wrap(randomDirectoryService(random, idxSettings, path), random, indexSettings, path.getShardId());
     }
 
+    @Override
+    public Directory newDirectory(IndexSettings indexSettings, ShardPath shardPath, boolean isPrimary) throws IOException {
+        return newDirectory(indexSettings,shardPath);
+    }
+
     public static void checkIndex(Logger logger, Store store, ShardId shardId) {
         if (store.tryIncRef()) {
             logger.info("start check index");

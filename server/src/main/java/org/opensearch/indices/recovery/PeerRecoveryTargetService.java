@@ -50,6 +50,7 @@ import org.opensearch.common.annotation.PublicApi;
 import org.opensearch.common.settings.Settings;
 import org.opensearch.common.unit.TimeValue;
 import org.opensearch.common.util.CancellableThreads;
+import org.opensearch.common.util.FeatureFlags;
 import org.opensearch.common.util.concurrent.AbstractRunnable;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.common.io.stream.StreamInput;
@@ -246,7 +247,8 @@ public class PeerRecoveryTargetService implements IndexEventListener {
                     logger.trace("{} preparing shard for peer recovery", recoveryTarget.shardId());
                     indexShard.prepareForIndexRecovery();
                     final boolean hasRemoteSegmentStore = indexShard.indexSettings().isRemoteStoreEnabled();
-                    if (hasRemoteSegmentStore || indexShard.isRemoteSeeded()) {
+                    if ((hasRemoteSegmentStore || indexShard.isRemoteSeeded()) &&
+                        (FeatureFlags.SHARED_STORAGE_SETTING.get(indexShard.indexSettings().getNodeSettings()) == false)) {
                         // ToDo: This is a temporary mitigation to not fail the peer recovery flow in case there is
                         // an exception while downloading segments from remote store. For remote backed indexes, we
                         // plan to revamp this flow so that node-node segment copy will not happen.

@@ -72,6 +72,21 @@ public class RemoteSegmentStoreDirectoryFactory implements IndexStorePlugin.Dire
         );
     }
 
+    @Override
+    public Directory newDirectory(IndexSettings indexSettings, ShardPath shardPath, boolean isPrimary) throws IOException {
+        String repositoryName = indexSettings.getRemoteStoreRepository();
+        String indexUUID = indexSettings.getIndex().getUUID();
+
+        return newDirectory(
+            repositoryName,
+            indexUUID,
+            shardPath.getShardId(),
+            indexSettings.getRemoteStorePathStrategy(),
+            null,
+            RemoteStoreUtils.isServerSideEncryptionEnabledIndex(indexSettings.getIndexMetadata())
+        );
+    }
+
     public Directory newDirectory(String repositoryName, String indexUUID, ShardId shardId, RemoteStorePathStrategy pathStrategy)
         throws IOException {
         return newDirectory(repositoryName, indexUUID, shardId, pathStrategy, null, false);

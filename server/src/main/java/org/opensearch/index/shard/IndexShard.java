@@ -99,6 +99,7 @@ import org.opensearch.common.metrics.MeanMetric;
 import org.opensearch.common.settings.Settings;
 import org.opensearch.common.unit.TimeValue;
 import org.opensearch.common.util.BigArrays;
+import org.opensearch.common.util.FeatureFlags;
 import org.opensearch.common.util.concurrent.AbstractAsyncTask;
 import org.opensearch.common.util.concurrent.AbstractRunnable;
 import org.opensearch.common.util.concurrent.AsyncIOProcessor;
@@ -613,6 +614,10 @@ public class IndexShard extends AbstractIndexShardComponent implements IndicesCl
 
     public Store remoteStore() {
         return this.remoteStore;
+    }
+
+    public boolean isSharedStorageEnabled() {
+        return FeatureFlags.SHARED_STORAGE_SETTING.get(indexSettings.getNodeSettings());
     }
 
     /**
@@ -1810,6 +1815,11 @@ public class IndexShard extends AbstractIndexShardComponent implements IndicesCl
                 pendingMergedSegmentCheckpoints.removeIf(s -> s.getSegmentName().equals(segmentCommitInfoName));
             }
         }
+
+        if (getEngine() instanceof ReadOnlyEngine) {
+            ReadOnlyEngine e = (ReadOnlyEngine) getEngine();
+            e.refreshReaderManager();
+        }
     }
 
     /**
@@ -2063,6 +2073,9 @@ public class IndexShard extends AbstractIndexShardComponent implements IndicesCl
             );
             return false;
         }
+        if (getEngine() instanceof ReadOnlyEngine) {
+            return true;
+        }
         if (getReplicationEngine().isEmpty()) {
             logger.trace(
                 () -> new ParameterizedMessage(
@@ -2072,6 +2085,7 @@ public class IndexShard extends AbstractIndexShardComponent implements IndicesCl
             );
             return false;
         }
+
         return true;
     }
 
@@ -2872,14 +2886,18 @@ public class IndexShard extends AbstractIndexShardComponent implements IndicesCl
                     final SegmentInfos lastCommittedSegmentInfos = store().readLastCommittedSegmentsInfo();
                     final String translogUUID = lastCommittedSegmentInfos.userData.get(TRANSLOG_UUID_KEY);
                     final long checkpoint = Long.parseLong(lastCommittedSegmentInfos.userData.get(SequenceNumbers.LOCAL_CHECKPOINT_KEY));
-                    Translog.createEmptyTranslog(
-                        shardPath().resolveTranslog(),
-                        shardId(),
-                        checkpoint,
-                        getPendingPrimaryTerm(),
-                        translogUUID,
-                        FileChannel::open
-                    );
+                    if (FeatureFlags.SHARED_STORAGE_SETTING.get(indexSettings().getNodeSettings()) && routingEntry().primary() == false) {
+                        //do notihng
+                    } else {
+                        Translog.createEmptyTranslog(
+                            shardPath().resolveTranslog(),
+                            shardId(),
+                            checkpoint,
+                            getPendingPrimaryTerm(),
+                            translogUUID,
+                            FileChannel::open
+                        );
+                    }
                 }
             }
             // we must create a new engine under mutex (see IndexShard#snapshotStoreMetadata).
@@ -5429,7 +5447,7 @@ public class IndexShard extends AbstractIndexShardComponent implements IndicesCl
                 // Extra segments will be wiped on engine open.
                 for (String file : List.of(store.directory().listAll())) {
                     if (file.startsWith(IndexFileNames.SEGMENTS)) {
-                        store.deleteQuiet(file);
+                        //store.deleteQuiet(file);
                     }
                 }
                 assert Arrays.stream(store.directory().listAll()).filter(f -> f.startsWith(IndexFileNames.SEGMENTS)).findAny().isEmpty()

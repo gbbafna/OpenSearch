@@ -830,6 +830,11 @@ public class IndexModuleTests extends OpenSearchTestCase {
         public Directory newDirectory(IndexSettings indexSettings, ShardPath shardPath) throws IOException {
             return new FsDirectoryFactory().newDirectory(indexSettings, shardPath);
         }
+
+        @Override
+        public Directory newDirectory(IndexSettings indexSettings, ShardPath shardPath, boolean isPrimary) throws IOException {
+            return newDirectory(indexSettings,shardPath);
+        }
     }
 
     public static final class Wrapper implements CheckedFunction<DirectoryReader, DirectoryReader, IOException> {

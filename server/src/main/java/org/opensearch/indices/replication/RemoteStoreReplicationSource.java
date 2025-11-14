@@ -129,11 +129,13 @@ public class RemoteStoreReplicationSource implements SegmentReplicationSource {
         ActionListener<GetSegmentFilesResponse> listener
     ) {
         try {
-            if (filesToFetch.isEmpty()) {
+            if (filesToFetch.isEmpty() || indexShard.isSharedStorageEnabled()) {
+                logger.info("For  shared storage  returning from here, as we don't download anything");
                 listener.onResponse(new GetSegmentFilesResponse(Collections.emptyList()));
                 return;
             }
             logger.debug("Downloading segment files from remote store {}", filesToFetch);
+
             if (remoteMetadataExists()) {
                 final Directory storeDirectory = indexShard.store().directory();
                 final Collection<String> directoryFiles = List.of(storeDirectory.listAll());

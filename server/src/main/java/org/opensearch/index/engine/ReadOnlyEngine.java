@@ -405,6 +405,13 @@ public class ReadOnlyEngine extends Engine {
         // opened side-by-side
     }
 
+    /**
+     * Refreshes the reader manager to pick up any new changes.
+     */
+    public void refreshReaderManager() throws IOException {
+        readerManager.maybeRefresh();
+    }
+
     @Override
     public boolean maybeRefresh(String source) throws EngineException {
         return false;

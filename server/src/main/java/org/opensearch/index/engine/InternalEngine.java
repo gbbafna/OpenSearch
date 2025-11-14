@@ -85,6 +85,7 @@ import org.opensearch.common.lucene.uid.VersionsAndSeqNoResolver;
 import org.opensearch.common.lucene.uid.VersionsAndSeqNoResolver.DocIdAndSeqNo;
 import org.opensearch.common.metrics.CounterMetric;
 import org.opensearch.common.unit.TimeValue;
+import org.opensearch.common.util.FeatureFlags;
 import org.opensearch.common.util.concurrent.AbstractRunnable;
 import org.opensearch.common.util.concurrent.KeyedLock;
 import org.opensearch.common.util.concurrent.ReleasableLock;
@@ -111,12 +112,14 @@ import org.opensearch.index.seqno.SequenceNumbers;
 import org.opensearch.index.shard.IndexShard;
 import org.opensearch.index.shard.OpenSearchMergePolicy;
 import org.opensearch.index.translog.InternalTranslogManager;
+import org.opensearch.index.translog.NoOpTranslogManager;
 import org.opensearch.index.translog.Translog;
 import org.opensearch.index.translog.TranslogCorruptedException;
 import org.opensearch.index.translog.TranslogDeletionPolicy;
 import org.opensearch.index.translog.TranslogException;
 import org.opensearch.index.translog.TranslogManager;
 import org.opensearch.index.translog.TranslogOperationHelper;
+import org.opensearch.index.translog.TranslogStats;
 import org.opensearch.index.translog.listener.CompositeTranslogEventListener;
 import org.opensearch.index.translog.listener.TranslogEventListener;
 import org.opensearch.search.suggest.completion.CompletionStats;
@@ -367,6 +370,18 @@ public class InternalEngine extends Engine {
         TranslogDeletionPolicy translogDeletionPolicy,
         CompositeTranslogEventListener translogEventListener
     ) throws IOException {
+
+        if (engineConfig.isReadOnlyReplica() &&
+            FeatureFlags.SHARED_STORAGE_SETTING.get(engineConfig.getIndexSettings().getNodeSettings()) ) {
+            return new NoOpTranslogManager(
+                shardId,
+                readLock,
+                () -> ensureOpen(),
+                new TranslogStats(),
+                Translog.EMPTY_TRANSLOG_SNAPSHOT
+            );
+        }
+
         return new InternalTranslogManager(
             engineConfig.getTranslogConfig(),
             engineConfig.getPrimaryTermSupplier(),

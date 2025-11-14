@@ -58,6 +58,8 @@ public class FeatureFlags {
      */
     public static final String WRITABLE_WARM_INDEX_EXPERIMENTAL_FLAG = "opensearch.experimental.feature.writable_warm_index.enabled";
 
+    public static final String SHARED_STORAGE_EXPERIMENTAL_FLAG = OS_EXPERIMENTAL_PREFIX + "shared_storage";
+
     /**
      * Gates the functionality of background task execution.
      */
@@ -68,6 +70,8 @@ public class FeatureFlags {
         false,
         Property.NodeScope
     );
+
+    public static final Setting<Boolean> SHARED_STORAGE_SETTING = Setting.boolSetting(SHARED_STORAGE_EXPERIMENTAL_FLAG, true,Property.NodeScope);
 
     public static final Setting<Boolean> EXTENSIONS_SETTING = Setting.boolSetting(EXTENSIONS, false, Property.NodeScope);
 

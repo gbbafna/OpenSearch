@@ -66,7 +66,6 @@ public interface IndexStorePlugin {
      *
      * @opensearch.api
      */
-    @FunctionalInterface
     @PublicApi(since = "1.0.0")
     interface DirectoryFactory {
         /**
@@ -77,6 +76,7 @@ public interface IndexStorePlugin {
          * @throws IOException if an IOException occurs while opening the directory
          */
         Directory newDirectory(IndexSettings indexSettings, ShardPath shardPath) throws IOException;
+        Directory newDirectory(IndexSettings indexSettings, ShardPath shardPath, boolean isPrimary) throws IOException;
     }
 
     /**
